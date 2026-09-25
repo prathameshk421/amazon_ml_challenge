@@ -120,9 +120,9 @@
       "holdout_frac": 0.1
     },
     "cut": {
-      "K_min": 10,
-      "K_max": 100,
-      "p_min": 0.005
+      "K_min": 5,
+      "K_max": 60,
+      "p_min": 0.05
     },
     "cut_grid": {
       "K_min": [
@@ -225,6 +225,21 @@
       "experiment": "E5",
       "metrics": "artifacts/metrics/s1_E5.json",
       "value": false
+    },
+    "rerank.cut.K_min": {
+      "experiment": "rerank-cut",
+      "metrics": "artifacts/metrics/rerank_cut.json",
+      "value": 5
+    },
+    "rerank.cut.K_max": {
+      "experiment": "rerank-cut",
+      "metrics": "artifacts/metrics/rerank_cut.json",
+      "value": 60
+    },
+    "rerank.cut.p_min": {
+      "experiment": "rerank-cut",
+      "metrics": "artifacts/metrics/rerank_cut.json",
+      "value": 0.05
     }
   }
 }
