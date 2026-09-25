@@ -17,6 +17,7 @@
 | matplotlib | 3.11.2 | PSF License (matplotlib agreement) |
 | tqdm | 4.70.1 | MPL-2.0 AND MIT |
 | pyarrow | 25.0.1 | Apache-2.0 |
+| git-lfs | 3.8.0 | MIT |
 
 Models: none downloaded yet (Phase 5). Allowed: Snowflake/snowflake-arctic-embed-xs (Apache-2.0),
 sentence-transformers/all-MiniLM-L6-v2 (Apache-2.0), BAAI/bge-small-en-v1.5 (MIT) — license to be

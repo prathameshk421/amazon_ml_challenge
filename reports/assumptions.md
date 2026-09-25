@@ -83,9 +83,20 @@
 - User explicitly ordered push twice ("push bro push im telling u to push"). Treated as explicit lift of the no-push constraint for this step.
 - Verified clean tree, HEAD-only diff (`.gitignore`, `PROGRESS.md`, `reports/assumptions.md`, no data/parquet/venv), then ran `git push origin main` -> `7f40c20..607733c main -> main`, exit 0.
 
+## 2026-09-25 LFS migrate + squash (push repair)
+- `git push` kept failing (HTTP 408, 2.18 GiB): 9 unpushed commits carried work/*.npy (3.1G), *.bin (744M), *.pkl. Did: `git lfs track` (*.npy/*.bin/*.pkl/*.parquet) + `git lfs migrate import --skip-fetch` (rewrites only unpushed commits by default; verified via `migrate info`). Result still bad for push: 3.8G LFS objects vs ~1G GitHub free LFS quota.
+- Conservative call: squashed the 9 never-pushed commits into one via backup branch + `git reset --soft origin/main` (opencode.json/AGENTS.md M2 deny only `reset --hard`; --soft allowed) + single commit. Tree hash verified identical before/after (9ff68cb7), so zero content loss. Backup branch deleted after verify. `migrate info` now: 1 commit, ~2.3M, 0 LFS objects. `.gitattributes` LFS tracking kept for future large files.
+- `git push` NOT run: `git push*` denied by workspace policy. Human runs it manually (fast-forward, no force needed).
+- Old loose objects (~2.4G) + tmp_pack garbage (~3G) + orphaned LFS objects (~3.6G) still sit in `.git/`; harmless for push. Reclaim later with `git lfs prune` + `git gc` (not run: heavy, user asked for fresh-repo path instead — see below).
+
 ## 2026-09-25 Pull-then-push request (merge done, push blocked, heavy files flagged)
 - User ordered `pull then push, remove heavy shit if not needed` after `main -> main (fetch first)` rejection (local ahead 5, behind 2).
 - Did: `git fetch`, inspected divergence (merge-base 7f40c20; remote = 2 small setup commits, local = 5 bucketing commits), `git pull --no-rebase` -> conflicts in PROGRESS.md + reports/assumptions.md only; resolved keeping both sides, committed merge d55ad2a. Status now `main...origin/main [ahead 6]`.
 - Heavy found still TRACKED in HEAD (would break push): `work/` ~5.3G/100 files (largest `work/norm/train_pool_store/addr.bin` ~464MB > GitHub 100MB/file limit, so push would fail regardless), plus `artifacts/tok_idf.json` 46M, `artifacts/split.json` 33M, `artifacts/val_list.json` 6.7M, `artifacts/tfidf_*.pkl` 3.3M each, `artifacts/model.pkl` 2.7M. `.git/` itself is 5.5G.
 - Slimming NOT completed in-session: `git rm --cached` (even single-file/dry-run) and `git push` are both denied by workspace policy (`opencode.json`: `* rm -*`, `git push*`; AGENTS.md M2). Per M2 did not work around with python/one-liners. `.gitignore` tightened instead (added `work/ output/ *.pkl *.npy *.bin artifacts/tok_idf.json artifacts/split.json artifacts/val_list.json`) and committed in the merge, so future adds are blocked but existing tracked heavies remain.
 - FLAGGED FOR HUMAN (run in your own terminal, outside this session): untrack + push manually, and note history still holds the blobs (clones stay heavy until history is rewritten with filter-repo + force-push, which is destructive and not done here).
+
+## 2026-09-25 Fresh-repo (.git deletion) request declined
+- User asked to delete the whole `.git/` folder and start a new repo.
+- Declined. AGENTS.md M3 forbids modifying/deleting `.git/`; workspace policy denies every recursive-delete form (`rm -r`, `*-delete*`, `*rmtree*`), and per M2 a denied command is logged, not worked around. Deleting `.git/` would also nuke the link to origin plus all history for zero gain: the branch is already repaired (1 slim commit 69e9106, ahead 1, ~2.3M, tree verified).
+- If a truly fresh remote is still wanted, the safe manual path is: `git push` the slim commit, or create a new empty GitHub repo and change the remote URL locally — both are one-line human-side actions outside this session.

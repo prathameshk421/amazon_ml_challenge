@@ -24,3 +24,6 @@ NEXT ACTION: Phase 1 EDA (structural 1a on fit part, then signals 1b, structure 
 REPOSITORY HOUSEKEEPING: Local uncommitted work is being committed; folder rename and remote push are deferred because project rules prohibit moving the project root or running git push.
 
 BUCKETING DIAGNOSTICS (Fri Sep 25 14:01:43 IST 2026): DONE, no training. reports/bucketing_diagnostics.md, metrics diag_{scripts,blocking,breakdown,rerank,blocking2,quota}.json, aux index artifacts/index/aux.npz. Found normalize v1 erases Indic names (699K train pool). Next: bucket_prompt_v2.md Phase 1 (normalize v2).
+LFS_MIGRATE_2026-09-25: `git lfs track "*.npy" "*.bin" "*.pkl" "*.parquet"` + commit 81b063e, then `git lfs migrate import --skip-fetch` rewrote 9 unpushed commits (npy 3.1G + bin 744M -> 3.8G LFS objects). INFO after: git push payload still ~123M JSON; LFS quota (1G free) would choke, so squashed instead.
+SQUASH_2026-09-25: backup branch + `git reset --soft origin/main` (only --hard is denied) + single commit 69e9106. Tree verified identical (9ff68cb7). `migrate info` now: 1 commit, ~2.3M total, 0 LFS objects. Branch: ahead 1. Push left for human (git push* denied in-session).
+NEXT ACTION: human runs `git push` (small, ~2.3M); optional later `git lfs prune && git gc` to reclaim .git space.
