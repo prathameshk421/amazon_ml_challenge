@@ -1,0 +1,723 @@
+{
+ "romanization_fail_examples": {
+  "DEVANAGARI": [
+   {
+    "s1": "vision impex private limited",
+    "pool_raw": "Vision इम्पेक्स Private Limited",
+    "pool_rom": "vision impeks private limited",
+    "shared_generic_skeletons": [
+     "LMT",
+     "MPKS",
+     "PRPT",
+     "PSN"
+    ]
+   },
+   {
+    "s1": "prime consulting llp",
+    "pool_raw": "प्राइम कंसल्टिंग एलएलपी",
+    "pool_rom": "praim kansalting elaelapi",
+    "shared_generic_skeletons": [
+     "KNSLTNK",
+     "LP",
+     "PRM"
+    ]
+   },
+   {
+    "s1": "tech food private limited",
+    "pool_raw": "टेक फूड प्राइवेट लिमिटेड",
+    "pool_rom": "tek phud praivet limited",
+    "shared_generic_skeletons": [
+     "LMT",
+     "PRPT",
+     "PT"
+    ]
+   },
+   {
+    "s1": "global infotech limited",
+    "pool_raw": "ग्लोबल इंफोटेक लिमिटेड",
+    "pool_rom": "global imphotek limited",
+    "shared_generic_skeletons": [
+     "KLPL",
+     "LMT"
+    ]
+   },
+   {
+    "s1": "eastern consultants",
+    "pool_raw": "ईस्टर्न कंसल्टेंट्स",
+    "pool_rom": "istarn kansaltents",
+    "shared_generic_skeletons": [
+     "KNSLTNTS",
+     "STRN"
+    ]
+   },
+   {
+    "s1": "supreme power private limited",
+    "pool_raw": "सुप्रीम पावर प्रा. लि.",
+    "pool_rom": "suprim pavar pra li",
+    "shared_generic_skeletons": [
+     "PR",
+     "SPRM"
+    ]
+   }
+  ],
+  "MALAYALAM": [
+   {
+    "s1": "maa industries private limited",
+    "pool_raw": "മാ ഇൻഡസ്ട്രീസ് പ്രൈവറ്റ് ലിമിറ്റഡ്",
+    "pool_rom": "ma indastris praivat limitad",
+    "shared_generic_skeletons": [
+     "LMT",
+     "NTSTRS",
+     "PRPT"
+    ]
+   },
+   {
+    "s1": "sun power private limited",
+    "pool_raw": "സൺ പവർ പ്രൈവറ്റ് ലിമിറ്റഡ്",
+    "pool_rom": "san pavar praivat limitad",
+    "shared_generic_skeletons": [
+     "LMT",
+     "PR",
+     "PRPT",
+     "SN"
+    ]
+   },
+   {
+    "s1": "prime foods private limited",
+    "pool_raw": "പ്രൈം Foods പ്രൈവറ്റ് ലിമിറ്റഡ്",
+    "pool_rom": "prain foods praivat limitad",
+    "shared_generic_skeletons": [
+     "LMT",
+     "PRPT",
+     "PTS"
+    ]
+   },
+   {
+    "s1": "south investments private limited",
+    "pool_raw": "സൗത്ത് ഇൻവെസ്റ്റ്മെന്റ്സ് പ്രൈവറ്റ് ലിമിറ്റഡ്",
+    "pool_rom": "satt investments praivat limitad",
+    "shared_generic_skeletons": [
+     "LMT",
+     "NPSTMNTS",
+     "PRPT",
+     "ST"
+    ]
+   },
+   {
+    "s1": "pioneer infra private limited",
+    "pool_raw": "പയനിയർ ഇൻഫ്ര പ്രൈവറ്റ് ലിമിറ്റഡ്",
+    "pool_rom": "payaniyar inphr praivat limitad",
+    "shared_generic_skeletons": [
+     "LMT",
+     "NPR",
+     "PNR",
+     "PRPT"
+    ]
+   },
+   {
+    "s1": "unique consultancy private limited",
+    "pool_raw": "യുണീക്ക് കൺസൾട്ടൻസി പ്രൈവറ്റ് ലിമിറ്റഡ്",
+    "pool_rom": "yunikk kansalttansi praivat limitad",
+    "shared_generic_skeletons": [
+     "LMT",
+     "NK",
+     "PRPT"
+    ]
+   }
+  ],
+  "ORIYA": [
+   {
+    "s1": "modern care private limited",
+    "pool_raw": "ମଡର୍ନ୍ କେୟାର୍ ପ୍ରାଇଭେଟ୍ ଲିମିଟେଡ୍",
+    "pool_rom": "madarn keyar praibhet limited",
+    "shared_generic_skeletons": [
+     "KR",
+     "LMT",
+     "MTRN",
+     "PRPT"
+    ]
+   },
+   {
+    "s1": "laxmi producer",
+    "pool_raw": "ଲକ୍ଷ୍ମୀ ପ୍ରୋଡ୍ୟୁସର୍",
+    "pool_rom": "lakshmi prodyusar",
+    "shared_generic_skeletons": [
+     "LKSM"
+    ]
+   },
+   {
+    "s1": "best agro private limited",
+    "pool_raw": "ବେଷ୍ଟ୍ ଆଗ୍ରୋ ପ୍ରାଇଭେଟ୍ ଲିମିଟେଡ୍",
+    "pool_rom": "besht agro praibhet limited",
+    "shared_generic_skeletons": [
+     "KR",
+     "LMT",
+     "PRPT",
+     "PST"
+    ]
+   },
+   {
+    "s1": "one it",
+    "pool_raw": "ୱାନ୍ ଆଇଟି",
+    "pool_rom": "wan aiti",
+    "shared_generic_skeletons": []
+   },
+   {
+    "s1": "bombay consultancy private limited",
+    "pool_raw": "ବମ୍ବେ କନସଲଟାନ୍ସି ପ୍ରାଇଭେଟ୍ ଲିମିଟେଡ୍",
+    "pool_rom": "bambe kanasalatansi praibhet limited",
+    "shared_generic_skeletons": [
+     "LMT",
+     "PMP",
+     "PRPT"
+    ]
+   },
+   {
+    "s1": "bombay consultancy private limited",
+    "pool_raw": "ବମ୍ବେ କନସଲଟାନ୍ସି ପ୍ରାଇଭେଟ୍ ଲିମିଟେଡ୍",
+    "pool_rom": "bambe kanasalatansi praibhet limited",
+    "shared_generic_skeletons": [
+     "LMT",
+     "PMP",
+     "PRPT"
+    ]
+   }
+  ],
+  "TELUGU": [
+   {
+    "s1": "ss star investment private limited",
+    "pool_raw": "ఎస్‌ఎస్ స్టార్ ఇన్వెస్ట్‌మెంట్ ప్రైవేట్ లిమిటెడ్",
+    "pool_rom": "eses star investment praivet limited",
+    "shared_generic_skeletons": [
+     "LMT",
+     "NPSTMNT",
+     "PRPT",
+     "STR"
+    ]
+   },
+   {
+    "s1": "jay media",
+    "pool_raw": "జై మీడియా",
+    "pool_rom": "jai midiya",
+    "shared_generic_skeletons": [
+     "MT"
+    ]
+   },
+   {
+    "s1": "prime technologies private limited",
+    "pool_raw": "ప్రైమ్ టెక్నాలజీస్ ప్రైవేట్ లిమిటెడ్",
+    "pool_rom": "praim teknalajis praivet limited",
+    "shared_generic_skeletons": [
+     "LMT",
+     "PRM",
+     "PRPT"
+    ]
+   },
+   {
+    "s1": "classic energy private limited",
+    "pool_raw": "క్లాసిక్ ఎనర్జీ ప్రైవేట్ లిమిటెడ్",
+    "pool_rom": "klasik enarji praivet limited",
+    "shared_generic_skeletons": [
+     "KLSK",
+     "LMT",
+     "PRPT"
+    ]
+   },
+   {
+    "s1": "global tech private limited",
+    "pool_raw": "గ్లోబల్ టెక్ ప్రైవేట్ లిమిటెడ్",
+    "pool_rom": "global tek praivet limited",
+    "shared_generic_skeletons": [
+     "KLPL",
+     "LMT",
+     "PRPT"
+    ]
+   },
+   {
+    "s1": "new consulting private limited",
+    "pool_raw": "న్యూ కన్సల్టింగ్ ప్రైవేట్ లిమిటెడ్",
+    "pool_rom": "nyu kansalting praivet limited",
+    "shared_generic_skeletons": [
+     "KNSLTNK",
+     "LMT",
+     "PRPT"
+    ]
+   }
+  ],
+  "BENGALI": [
+   {
+    "s1": "green care private limited",
+    "pool_raw": "গ্রীন কেয়ার প্রাইভেট লিমিটেড",
+    "pool_rom": "grin keyar praibhet limited",
+    "shared_generic_skeletons": [
+     "KR",
+     "KRN",
+     "LMT",
+     "PRPT"
+    ]
+   },
+   {
+    "s1": "dynamic impex private limited",
+    "pool_raw": "ডায়নামিক ইম্পেক্স প্রাইভেট লিমিটেড",
+    "pool_rom": "dayanamik impeks praibhet limited",
+    "shared_generic_skeletons": [
+     "LMT",
+     "MPKS",
+     "PRPT",
+     "TNMK"
+    ]
+   },
+   {
+    "s1": "alpha constructions private limited",
+    "pool_raw": "আলফা কনস্ট্রাকশনস Private Limited",
+    "pool_rom": "alapha kanastrakashanas private limited",
+    "shared_generic_skeletons": [
+     "LMT",
+     "LP",
+     "PRPT"
+    ]
+   },
+   {
+    "s1": "global exports private limited",
+    "pool_raw": "গ্লোবাল এক্সপোর্টস প্রাইভেট লিমিটেড",
+    "pool_rom": "global eksaportas praibhet limited",
+    "shared_generic_skeletons": [
+     "KLPL",
+     "KSPRTS",
+     "LMT",
+     "PRPT"
+    ]
+   },
+   {
+    "s1": "maa global private limited",
+    "pool_raw": "মা গ্লোবাল প্রাইভেট লিমিটেড",
+    "pool_rom": "ma global praibhet limited",
+    "shared_generic_skeletons": [
+     "KLPL",
+     "LMT",
+     "PRPT"
+    ]
+   },
+   {
+    "s1": "apex projects private limited",
+    "pool_raw": "অ্যাপেক্স প্রজেক্টস প্রাইভেট লিমিটেড",
+    "pool_rom": "ayapeks prajektas praibhet limited",
+    "shared_generic_skeletons": [
+     "LMT",
+     "PKS",
+     "PRPT",
+     "PRSKTS"
+    ]
+   }
+  ],
+  "KANNADA": [
+   {
+    "s1": "silver products private limited",
+    "pool_raw": "ಸಿಲ್ವರ್ ಪ್ರೊಡಕ್ಟ್ಸ್ ಪ್ರೈವೇಟ್ ಲಿಮಿಟೆಡ್",
+    "pool_rom": "silvar prodakts praivet limited",
+    "shared_generic_skeletons": [
+     "LMT",
+     "PRPT",
+     "PRTKTS",
+     "SLPR"
+    ]
+   },
+   {
+    "s1": "good products private limited",
+    "pool_raw": "ಗುಡ್ ಪ್ರೊಡಕ್ಟ್ಸ್ ಪ್ರೈವೇಟ್ ಲಿಮಿಟೆಡ್",
+    "pool_rom": "gud prodakts praivet limited",
+    "shared_generic_skeletons": [
+     "KT",
+     "LMT",
+     "PRPT",
+     "PRTKTS"
+    ]
+   },
+   {
+    "s1": "great solutions private limited",
+    "pool_raw": "ಗ್ರೇಟ್ ಸೊಲ್ಯೂಷನ್ಸ್ ಪ್ರೈವೇಟ್ ಲಿಮಿಟೆಡ್",
+    "pool_rom": "gret solyushans praivet limited",
+    "shared_generic_skeletons": [
+     "KRT",
+     "LMT",
+     "PRPT"
+    ]
+   },
+   {
+    "s1": "dream food private limited",
+    "pool_raw": "ಡ್ರೀಮ್ ಫುಡ್ ಪ್ರೈವೇಟ್ ಲಿಮಿಟೆಡ್",
+    "pool_rom": "drim phud praivet limited",
+    "shared_generic_skeletons": [
+     "LMT",
+     "PRPT",
+     "PT",
+     "TRM"
+    ]
+   },
+   {
+    "s1": "golden finance limited",
+    "pool_raw": "ಗೋಲ್ಡನ್ ಫೈನಾನ್ಸ್ ಲಿಮಿಟೆಡ್",
+    "pool_rom": "goldan phainans limited",
+    "shared_generic_skeletons": [
+     "KLTN",
+     "LMT"
+    ]
+   },
+   {
+    "s1": "sri enterprises",
+    "pool_raw": "ಶ್ರೀ ಎಂಟರ್‌ಪ್ರೈಸಸ್",
+    "pool_rom": "sri entarpraisas",
+    "shared_generic_skeletons": [
+     "NTRPRS",
+     "SR"
+    ]
+   }
+  ],
+  "TAMIL": [
+   {
+    "s1": "baba care private limited",
+    "pool_raw": "பாபா கேர் பிரைவேட் லிமிடெட்",
+    "pool_rom": "papa ker piraivet limitet",
+    "shared_generic_skeletons": [
+     "KR",
+     "LMT",
+     "PRPT"
+    ]
+   },
+   {
+    "s1": "innovative galaxy software",
+    "pool_raw": "இன்னோவேட்டிவ் கேலக்ஸி சாஃப்ட்வேர்",
+    "pool_rom": "innovettiv kelaksi chahptver",
+    "shared_generic_skeletons": [
+     "KLKS",
+     "NPTP",
+     "SPTPR"
+    ]
+   },
+   {
+    "s1": "sky infotech limited",
+    "pool_raw": "ஸ்கை இன்ஃபோடெக் லிமிடெட்",
+    "pool_rom": "skai inhpotek limitet",
+    "shared_generic_skeletons": [
+     "LMT",
+     "SK"
+    ]
+   },
+   {
+    "s1": "lotus developers private limited",
+    "pool_raw": "லோட்டஸ் டெவலப்பர்ஸ் பிரைவேட் லிமிடெட்",
+    "pool_rom": "lottas tevalappars piraivet limitet",
+    "shared_generic_skeletons": [
+     "LMT",
+     "LTS",
+     "PRPT",
+     "TPLPRS"
+    ]
+   },
+   {
+    "s1": "good trading private limited",
+    "pool_raw": "குட் டிரேடிங் பிரைவேட் லிமிடெட்",
+    "pool_rom": "kut tiretin piraivet limitet",
+    "shared_generic_skeletons": [
+     "KT",
+     "LMT",
+     "PRPT"
+    ]
+   },
+   {
+    "s1": "silver energy limited",
+    "pool_raw": "சில்வர் எனர்ஜி லிமிடெட்",
+    "pool_rom": "chilvar enarji limitet",
+    "shared_generic_skeletons": [
+     "LMT",
+     "SLPR"
+    ]
+   }
+  ],
+  "GUJARATI": [
+   {
+    "s1": "sky healthcare private limited",
+    "pool_raw": "સ્કાય હેલ્થકેર પ્રાઇવેટ લિમિટેડ",
+    "pool_rom": "skay helthaker praivet limited",
+    "shared_generic_skeletons": [
+     "LMT",
+     "LTKR",
+     "PRPT",
+     "SK"
+    ]
+   },
+   {
+    "s1": "ss international consultancy private limited",
+    "pool_raw": "એસએસ ઇન્ટરનેશનલ કન્સલ્ટન્સી પ્રાઇવેટ લિમિટેડ",
+    "pool_rom": "esaes intaraneshanal kansaltansi praivet limited",
+    "shared_generic_skeletons": [
+     "LMT",
+     "PRPT"
+    ]
+   },
+   {
+    "s1": "city exports private limited",
+    "pool_raw": "સિટી એક્સપોર્ટ્સ પ્રાઇવેટ લિમિટેડ",
+    "pool_rom": "siti eksaports praivet limited",
+    "shared_generic_skeletons": [
+     "KSPRTS",
+     "LMT",
+     "PRPT"
+    ]
+   },
+   {
+    "s1": "laxmi tech private limited",
+    "pool_raw": "લક્ષ્મી ટેક પ્રાઇવેટ લિમિટેડ",
+    "pool_rom": "lakshmi tek praivet limited",
+    "shared_generic_skeletons": [
+     "LKSM",
+     "LMT",
+     "PRPT"
+    ]
+   },
+   {
+    "s1": "innovative hospitality private limited",
+    "pool_raw": "ઇનોવેટિવ હોસ્પિટાલિટી પ્રા. લિ.",
+    "pool_rom": "inovetiv hospitaliti pra li",
+    "shared_generic_skeletons": [
+     "NPTP",
+     "SPTLT"
+    ]
+   },
+   {
+    "s1": "high impex private limited",
+    "pool_raw": "હાઇ ઇમ્પેક્સ પ્રાઇવેટ લિમિટેડ",
+    "pool_rom": "hai impeks praivet limited",
+    "shared_generic_skeletons": [
+     "LMT",
+     "MPKS",
+     "PRPT"
+    ]
+   }
+  ],
+  "GURMUKHI": [
+   {
+    "s1": "vision industries private limited",
+    "pool_raw": "ਵਿਜ਼ਨ ਇੰਡਸਟ੍ਰੀਜ਼ ਪ੍ਰਾਈਵੇਟ ਲਿਮਟਿਡ",
+    "pool_rom": "vijan i dasatrij praivet limatid",
+    "shared_generic_skeletons": [
+     "LMT",
+     "PRPT",
+     "PSN"
+    ]
+   },
+   {
+    "s1": "super ventures private limited",
+    "pool_raw": "ਸੁਪਰ ਵੈਂਚਰਜ਼ ਪ੍ਰਾਈਵੇਟ ਲਿਮਟਿਡ",
+    "pool_rom": "supar vaicharaj praivet limatid",
+    "shared_generic_skeletons": [
+     "LMT",
+     "PRPT",
+     "SPR"
+    ]
+   },
+   {
+    "s1": "golden anand infra private limited",
+    "pool_raw": "ਗੋਲਡਨ ਅਨੰਦ ਇਨਫ੍ਰਾ ਪ੍ਰਾਈਵੇਟ ਲਿਮਟਿਡ",
+    "pool_rom": "goladan an d inaphra praivet limatid",
+    "shared_generic_skeletons": [
+     "KLTN",
+     "LMT",
+     "NPR",
+     "PRPT"
+    ]
+   },
+   {
+    "s1": "real technologies llp",
+    "pool_raw": "ਰੀਅਲ ਟੈਕਨਾਲੋਜੀਜ਼ ਐਲਐਲਪੀ",
+    "pool_rom": "rial taikanalojij ailaailapi",
+    "shared_generic_skeletons": [
+     "LP",
+     "RL"
+    ]
+   },
+   {
+    "s1": "real technologies llp",
+    "pool_raw": "ਰੀਅਲ ਟੈਕਨਾਲੋਜੀਜ਼ ਐਲਐਲਪੀ",
+    "pool_rom": "rial taikanalojij ailaailapi",
+    "shared_generic_skeletons": [
+     "LP",
+     "RL"
+    ]
+   },
+   {
+    "s1": "apex ventures private limited",
+    "pool_raw": "ਏਪੈਕਸ ਵੈਂਚਰਜ਼ ਪ੍ਰਾਈਵੇਟ ਲਿਮਟਿਡ",
+    "pool_rom": "epaikas vaicharaj praivet limatid",
+    "shared_generic_skeletons": [
+     "LMT",
+     "PKS",
+     "PRPT"
+    ]
+   }
+  ]
+ },
+ "dict_single_entity_entries": [],
+ "dict_entries_sample": [
+  [
+   "praivet",
+   "private"
+  ],
+  [
+   "pra",
+   "private"
+  ],
+  [
+   "li",
+   "limited"
+  ],
+  [
+   "limitet",
+   "limited"
+  ],
+  [
+   "praibhet",
+   "private"
+  ],
+  [
+   "piraivet",
+   "private"
+  ],
+  [
+   "limitad",
+   "limited"
+  ],
+  [
+   "tek",
+   "tech"
+  ],
+  [
+   "elaelapi",
+   "llp"
+  ],
+  [
+   "praivat",
+   "private"
+  ],
+  [
+   "aiti",
+   "it"
+  ],
+  [
+   "intaraneshanal",
+   "international"
+  ],
+  [
+   "impeks",
+   "impex"
+  ],
+  [
+   "estet",
+   "estate"
+  ],
+  [
+   "enarji",
+   "energy"
+  ],
+  [
+   "bildars",
+   "builders"
+  ],
+  [
+   "prodyusar",
+   "producer"
+  ],
+  [
+   "kanstrakshan",
+   "construction"
+  ],
+  [
+   "treding",
+   "trading"
+  ],
+  [
+   "prodakts",
+   "products"
+  ],
+  [
+   "phuds",
+   "foods"
+  ],
+  [
+   "midiya",
+   "media"
+  ],
+  [
+   "solyushans",
+   "solutions"
+  ],
+  [
+   "devalapars",
+   "developers"
+  ],
+  [
+   "kansalting",
+   "consulting"
+  ],
+  [
+   "sistams",
+   "systems"
+  ],
+  [
+   "venchars",
+   "ventures"
+  ],
+  [
+   "kansaltents",
+   "consultants"
+  ],
+  [
+   "kansaltensi",
+   "consultancy"
+  ],
+  [
+   "bijanes",
+   "business"
+  ],
+  [
+   "lojistiks",
+   "logistics"
+  ],
+  [
+   "injiniyaring",
+   "engineering"
+  ],
+  [
+   "elelpi",
+   "llp"
+  ],
+  [
+   "teknoloji",
+   "technology"
+  ],
+  [
+   "indastrij",
+   "industries"
+  ],
+  [
+   "investament",
+   "investment"
+  ],
+  [
+   "egro",
+   "agro"
+  ],
+  [
+   "eksaports",
+   "exports"
+  ],
+  [
+   "projekts",
+   "projects"
+  ],
+  [
+   "investaments",
+   "investments"
+  ]
+ ]
+}

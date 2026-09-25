@@ -1,0 +1,19 @@
+{
+ "rapidfuzz_ms_per_query_N100": 0.4513847827911377,
+ "rapidfuzz_ms_per_query_N700": 2.685379981994629,
+ "lgb_500trees_us_per_row": 22.588889598846436,
+ "lgb_500trees_ms_per_700row_call": 15.616129636764526,
+ "query_volumes": {
+  "TEST": 1732544,
+  "MATCH_POOL": 1675457,
+  "VAL": 441364,
+  "RR+DEV": 100000
+ },
+ "stage2_ms_per_query_at_700_cands_excl_stage1_and_feature_glue": 18.301509618759155,
+ "stage2_cpu_hours_total": 20.07759487096965,
+ "candidate_pairs_tsv_bytes_at_mean": {
+  "50": 1150409216,
+  "80": 1826101376,
+  "100": 2276562816
+ }
+}

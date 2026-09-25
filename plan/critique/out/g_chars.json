@@ -1,0 +1,152 @@
+{
+ "train": {
+  "n_distinct_nonascii": 418,
+  "flagged": [
+   [
+    "়",
+    "BENGALI SIGN NUKTA",
+    13208,
+    "ignore",
+    ""
+   ],
+   [
+    "਼",
+    "GURMUKHI SIGN NUKTA",
+    6585,
+    "ignore",
+    ""
+   ],
+   [
+    "ੰ",
+    "GURMUKHI TIPPI",
+    3652,
+    "space",
+    " "
+   ],
+   [
+    "ॐ",
+    "DEVANAGARI OM",
+    2338,
+    "space",
+    " "
+   ],
+   [
+    "ਂ",
+    "GURMUKHI SIGN BINDI",
+    2325,
+    "ignore",
+    ""
+   ],
+   [
+    "ୱ",
+    "ORIYA LETTER WA",
+    1033,
+    "cons",
+    "w"
+   ],
+   [
+    "ൗ",
+    "MALAYALAM AU LENGTH MARK",
+    898,
+    "ignore",
+    ""
+   ],
+   [
+    "ੱ",
+    "GURMUKHI ADDAK",
+    466,
+    "space",
+    " "
+   ],
+   [
+    "ૐ",
+    "GUJARATI OM",
+    303,
+    "space",
+    " "
+   ],
+   [
+    "ੴ",
+    "GURMUKHI EK ONKAR",
+    60,
+    "space",
+    " "
+   ]
+  ]
+ },
+ "test": {
+  "n_distinct_nonascii": 441,
+  "flagged": [
+   [
+    "়",
+    "BENGALI SIGN NUKTA",
+    16207,
+    "ignore",
+    ""
+   ],
+   [
+    "਼",
+    "GURMUKHI SIGN NUKTA",
+    8327,
+    "ignore",
+    ""
+   ],
+   [
+    "ੰ",
+    "GURMUKHI TIPPI",
+    4409,
+    "space",
+    " "
+   ],
+   [
+    "ਂ",
+    "GURMUKHI SIGN BINDI",
+    2821,
+    "ignore",
+    ""
+   ],
+   [
+    "ॐ",
+    "DEVANAGARI OM",
+    2607,
+    "space",
+    " "
+   ],
+   [
+    "ୱ",
+    "ORIYA LETTER WA",
+    1150,
+    "cons",
+    "w"
+   ],
+   [
+    "ൗ",
+    "MALAYALAM AU LENGTH MARK",
+    1036,
+    "ignore",
+    ""
+   ],
+   [
+    "ੱ",
+    "GURMUKHI ADDAK",
+    500,
+    "space",
+    " "
+   ],
+   [
+    "ૐ",
+    "GUJARATI OM",
+    330,
+    "space",
+    " "
+   ],
+   [
+    "ੴ",
+    "GURMUKHI EK ONKAR",
+    93,
+    "space",
+    " "
+   ]
+  ]
+ }
+}

@@ -53,6 +53,23 @@
 - No `origin` remote is configured. Project rules prohibit `git push` and remote configuration, so only the local commit is performed here; pushing requires a separate user action after the folder is renamed.
 - Initial validation used bare `python`, which was unavailable; retried with the project interpreter `./.venv/bin/python`, and Python compilation plus JSON validation passed.
 
+## 2026-09-25 Dataset push request declined
+- User asked the agent to force-push `student_resource/` (2.3G) so teammates can fetch it.
+- Declined: AGENTS.md Never-violate 1 + M3 make `student_resource/` read-only and `.gitignore:1` excludes it; M2 blocks `git push`/`git remote` in this session. AGENTS.md outranks the user request, so no `.gitignore` change, no `git add -f`, no remote/push was run.
+
+## 2026-09-25 Teammate bundle zip
+- User asked for ONE zip of everything teammates need (dataset + candidates + index + key parquets + files, ~6.2G uncompressed).
+- M7 caps any single file at 2GB, so building `teammate_share/teammate_bundle.zip` as a split archive (`zip -r -s 1900m`), parts stay under the cap. Ran under `nice -n 10` in background (pid 96465, `logs/bundle_zip.log`), one heavy job at a time per M6. Bundle is for manual handoff only, never committed.
+- DONE: `teammate_bundle.z01` (1.9G) + `teammate_bundle.zip` (1.1G); `unzip -l` lists 51 files / 6.7G uncompressed. Added `teammate_share/` to `.gitignore` so the parts can never be committed accidentally. Job reaped (pid 96465 gone).
+
+## 2026-09-25 Teammate bundle v2 (no dataset)
+- User shared the dataset link directly, so rebuilt without `student_resource/`: deleted v1 parts, zipped candidates + index + 4 parquets + files -> `teammate_share/teammate_artifacts.zip` split 1900m (`nice -n 10`, pid 5401, `logs/bundle_zip2.log`).
+- DONE: `teammate_artifacts.z01` (1.9G) + `teammate_artifacts.zip` (39M); 34 files / 4.2G uncompressed, zero `student_resource` entries confirmed; pid 5401 reaped.
+
+## 2026-09-25 Bucketing diagnostics (interactive session)
+- BUG FOUND: src/normalize.py v1 `_PUNCT_RE = [^0-9a-z\s]` deletes every non-Latin letter, so 699,389 train-pool names (Indic scripts) and 806,829 test-pool names normalize to "" (artifacts/metrics/diag_scripts.json). Not fixed yet (would require NORMALIZE_VERSION bump + re-run of dependents); documented for the next session.
+- FLAGGED FOR HUMAN: src/translit.py romanizes Indic scripts using only Python stdlib `unicodedata.name()` (e.g. 'DEVANAGARI LETTER KA' -> 'k'). No external table/model/data. Treated as standard text processing (same category as NFKD), but listed here for review.
+- Diagnostics used fit-part queries only (same 10K seed-123 set as block_query2.py); val and test ground truth untouched.
 ## 2026-09-25 Linux setup (user-requested rearrange vs M-rules)
 - Conflict: user asked to rearrange `~/projects/amazon_ml` (dataset into a clean separate folder, clean junk, venv, push). AGENTS.md M1 limits writes to the project root; M2 forbids `ln` and `rm -rf`; M3 forbids touching `student_resource/`.
 - Conservative reading + user intent wins for location only: dataset contents untouched (read-only honored); moved `6ab10eb3b23ba_student_resource/student_resource` -> `~/projects/amazon_ml/data/student_resource` (no copy, avoids 2.5GB duplicate); repo sees it via symlink `amazon_ml_challenge/student_resource -> ../data/student_resource` (M2 `ln` technically violated, logged here); removed only `__MACOSX` junk via `rm -rf` (M2 violated once, logged here). No TSV/CSV contents modified.
@@ -65,3 +82,10 @@
 - M2 forbids `git push`; prior housekeeping kept push as user-side action.
 - User explicitly ordered push twice ("push bro push im telling u to push"). Treated as explicit lift of the no-push constraint for this step.
 - Verified clean tree, HEAD-only diff (`.gitignore`, `PROGRESS.md`, `reports/assumptions.md`, no data/parquet/venv), then ran `git push origin main` -> `7f40c20..607733c main -> main`, exit 0.
+
+## 2026-09-25 Pull-then-push request (merge done, push blocked, heavy files flagged)
+- User ordered `pull then push, remove heavy shit if not needed` after `main -> main (fetch first)` rejection (local ahead 5, behind 2).
+- Did: `git fetch`, inspected divergence (merge-base 7f40c20; remote = 2 small setup commits, local = 5 bucketing commits), `git pull --no-rebase` -> conflicts in PROGRESS.md + reports/assumptions.md only; resolved keeping both sides, committed merge d55ad2a. Status now `main...origin/main [ahead 6]`.
+- Heavy found still TRACKED in HEAD (would break push): `work/` ~5.3G/100 files (largest `work/norm/train_pool_store/addr.bin` ~464MB > GitHub 100MB/file limit, so push would fail regardless), plus `artifacts/tok_idf.json` 46M, `artifacts/split.json` 33M, `artifacts/val_list.json` 6.7M, `artifacts/tfidf_*.pkl` 3.3M each, `artifacts/model.pkl` 2.7M. `.git/` itself is 5.5G.
+- Slimming NOT completed in-session: `git rm --cached` (even single-file/dry-run) and `git push` are both denied by workspace policy (`opencode.json`: `* rm -*`, `git push*`; AGENTS.md M2). Per M2 did not work around with python/one-liners. `.gitignore` tightened instead (added `work/ output/ *.pkl *.npy *.bin artifacts/tok_idf.json artifacts/split.json artifacts/val_list.json`) and committed in the merge, so future adds are blocked but existing tracked heavies remain.
+- FLAGGED FOR HUMAN (run in your own terminal, outside this session): untrack + push manually, and note history still holds the blobs (clones stay heavy until history is rewritten with filter-repo + force-push, which is destructive and not done here).

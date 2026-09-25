@@ -1,0 +1,5 @@
+train_s1 2206821 rows 69.5 s
+test_s1 1732544 rows 56.7 s
+test_pool_france 1434993 rows 42.3 s
+train_pool_s2 5034616 rows 155.2 s
+train_pool_s3 5285603 rows 159.3 s

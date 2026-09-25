@@ -1,0 +1,9 @@
+{
+ "pool_per_s1_train": 4.676509331749154,
+ "pool_per_s1_test": 5.754306384138007,
+ "links_per_s1_train": 3.4612526344456573,
+ "train_orphan_share": 0.259864059086343,
+ "ESTIMATE_test_links_if_same_rate": 5996772.484293017,
+ "ESTIMATE_test_orphan_share_if_same_rate": 0.3984935101845205,
+ "test_france_s1_share": 0.14975204092940786
+}

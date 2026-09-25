@@ -14,3 +14,12 @@ artifacts/index/
 teammate_artifacts.zip
 .DS_Store
 __pycache__/
+teammate_share/
+work/
+output/
+*.pkl
+*.npy
+*.bin
+artifacts/tok_idf.json
+artifacts/split.json
+artifacts/val_list.json

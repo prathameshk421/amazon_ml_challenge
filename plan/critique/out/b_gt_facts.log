@@ -1,0 +1,256 @@
+{
+ "n_pool": 10320219,
+ "pool_addr_state_counts": {
+  "nonempty": 9975336,
+  "empty": 344883,
+  "null_or_punct_only": 0
+ },
+ "pool_name_raw_empty": 0,
+ "pool_name_norm_empty": 0,
+ "gt_rows": 2206821,
+ "n_links": 7638365,
+ "singletons": 123247,
+ "max_matches": 11,
+ "unique_pool_in_links": 7638365,
+ "one_owner_holds": true,
+ "orphan_pool_records": 2681854,
+ "country_crosstab_all_links": {
+  "US->US": 4578522,
+  "India->India": 3059843
+ },
+ "cross_country_links": 0,
+ "true_pairs_pool_name_raw_empty": 0,
+ "true_pairs_pool_addr": {
+  "empty": 337018,
+  "null_or_punct_only": 0,
+  "share_empty_or_null": 0.044121745949558575
+ },
+ "entities_all_matches_addr_empty_or_null": 6225,
+ "true_pairs_indic_name_and_empty_addr": 798,
+ "entities_all_matches_indic_name": 40636,
+ "true_pairs_indic_name": 551240,
+ "true_pairs_exact_name_equal": 0.2855093989355052,
+ "segments_by_chain": {
+  "1": {
+   "n_pairs": 4590302,
+   "share_pairs": 0.6009534763002292,
+   "exact_name_equal": 0.2953023570126759,
+   "d_EN_p50": 1.0,
+   "d_EN_p90": 3.0,
+   "share_dEN_gt_300": 6.535517706678123e-07,
+   "share_dEN_gt_1000": 6.535517706678123e-07
+  },
+  "2-9": {
+   "n_pairs": 1660186,
+   "share_pairs": 0.21734834614475743,
+   "exact_name_equal": 0.29081741443428627,
+   "d_EN_p50": 4.0,
+   "d_EN_p90": 11.0,
+   "share_dEN_gt_300": 0.0,
+   "share_dEN_gt_1000": 0.0
+  },
+  ">=10": {
+   "n_pairs": 1387877,
+   "share_pairs": 0.1816981775550134,
+   "exact_name_equal": 0.24677042706234054,
+   "d_EN_p50": 31.0,
+   "d_EN_p90": 138.0,
+   "share_dEN_gt_300": 0.009974226822693942,
+   "share_dEN_gt_1000": 0.0
+  }
+ },
+ "s1_entities_in_chain_ge2": 0.3994433621938526,
+ "s1_entities_in_chain_ge10": 0.1821253286967996,
+ "EN_cap_0.002": 20640,
+ "share_true_pairs_query_dEN_gt_cap": 0.0,
+ "top_EN_df_pool": [
+  [
+   "physical therapy",
+   1071
+  ],
+  [
+   "primary care",
+   1070
+  ],
+  [
+   "pediatric dental",
+   1004
+  ],
+  [
+   "womens health",
+   978
+  ],
+  [
+   "urgent care",
+   977
+  ],
+  [
+   "pediatric dentistry",
+   947
+  ],
+  [
+   "behavioral health",
+   924
+  ],
+  [
+   "internal medicine",
+   922
+  ],
+  [
+   "foot and ankle",
+   713
+  ],
+  [
+   "earnosethroat com",
+   693
+  ],
+  [
+   "ear nose and throat",
+   692
+  ],
+  [
+   "the dent",
+   657
+  ],
+  [
+   "straight edge",
+   633
+  ],
+  [
+   "main street",
+   632
+  ],
+  [
+   "commission on",
+   563
+  ]
+ ],
+ "share_true_pairs_sameEN_and_dEN_gt_300": 0.0008301514787523246,
+ "heldout20_share_name_seen_in_fit80": 0.37871912615819364,
+ "heldout20_share_name_seen_by_country": {
+  "India": 0.4411901073177351,
+  "US": 0.3369917440270717
+ },
+ "heldout20_true_pairs_share_query_name_seen": 0.37866968815991586,
+ "test_s1": {
+  "n": 1732544,
+  "countries": {
+   "US": 663106,
+   "France": 259452,
+   "India": 809986
+  },
+  "chain_ge2": 0.37494747608141554,
+  "chain_ge10": 0.17868983413985445,
+  "share_name_seen_in_train_s1": 0.3526207703815892,
+  "by_country": {
+   "France": {
+    "n": 259452,
+    "chain_ge2": 0.3438555108459368,
+    "chain_ge10": 0.11095694001202534,
+    "share_name_seen_in_train_s1": 0.00013489971170004472
+   },
+   "India": {
+    "n": 809986,
+    "chain_ge2": 0.45284733316378306,
+    "chain_ge10": 0.24702155345894866,
+    "share_name_seen_in_train_s1": 0.4602091888007941
+   },
+   "US": {
+    "n": 663106,
+    "chain_ge2": 0.2919578468600797,
+    "chain_ge10": 0.12172412857069609,
+    "share_name_seen_in_train_s1": 0.35911754681755254
+   }
+  }
+ },
+ "train_s1_by_country": {
+  "India": {
+   "chain_ge2": 0.46024289279292746,
+   "chain_ge10": 0.2506216117066808,
+   "heldout_seen": 0.4411901073177351
+  },
+  "US": {
+   "chain_ge2": 0.3588751564821971,
+   "chain_ge10": 0.1364215005216703,
+   "heldout_seen": 0.3369917440270717
+  }
+ },
+ "test_top_chains": [
+  [
+   "bordeaux club sarl",
+   205
+  ],
+  [
+   "nantes club sarl",
+   157
+  ],
+  [
+   "lille club sarl",
+   147
+  ],
+  [
+   "new delhi india private limited",
+   123
+  ],
+  [
+   "urgent care group",
+   123
+  ],
+  [
+   "lille club sas",
+   122
+  ],
+  [
+   "bordeaux club sas",
+   118
+  ],
+  [
+   "nantes club sas",
+   117
+  ],
+  [
+   "bordeaux amicale sarl",
+   116
+  ],
+  [
+   "ear nose and throat group",
+   112
+  ]
+ ],
+ "old_K150_fit_sample": {
+  "n_entities": 60000,
+  "singletons": 3351,
+  "pair_recall": 0.925141174767122,
+  "entity_recall": 0.9865664001129764,
+  "full_recall": 0.812882839944218,
+  "F05_ceiling_perfect_precision_incl_singletons": 0.9685680847281237,
+  "F05_ceiling_nonsingletons": 0.9685680847281237
+ },
+ "F05_ceiling_if_miss_one_of_k": {
+  "1": 0.0,
+  "2": 0.8333333333333334,
+  "3": 0.9090909090909091,
+  "4": 0.9375,
+  "5": 0.9523809523809523,
+  "6": 0.9615384615384615,
+  "7": 0.9677419354838709,
+  "8": 0.9722222222222222,
+  "9": 0.9756097560975611,
+  "10": 0.9782608695652175,
+  "11": 0.980392156862745
+ },
+ "match_count_hist": {
+  "0": 123247,
+  "1": 119157,
+  "2": 375212,
+  "3": 530841,
+  "4": 484115,
+  "5": 321957,
+  "6": 164868,
+  "7": 63968,
+  "8": 18680,
+  "9": 4205,
+  "10": 534,
+  "11": 37
+ }
+}

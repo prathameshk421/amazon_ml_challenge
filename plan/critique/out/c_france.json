@@ -1,0 +1,860 @@
+{
+ "n_france_s1": 259452,
+ "n_france_pool": 1434993,
+ "name_token_share_france": {
+  "sarl": {
+   "s1": 0.2832,
+   "pool": 0.2077
+  },
+  "sas": {
+   "s1": 0.2015,
+   "pool": 0.1398
+  },
+  "sasu": {
+   "s1": 0.0413,
+   "pool": 0.0438
+  },
+  "eurl": {
+   "s1": 0.0654,
+   "pool": 0.0584
+  },
+  "sa": {
+   "s1": 0.0492,
+   "pool": 0.0484
+  },
+  "snc": {
+   "s1": 0.0,
+   "pool": 0.0103
+  },
+  "sci": {
+   "s1": 0.0322,
+   "pool": 0.0385
+  },
+  "scop": {
+   "s1": 0.0,
+   "pool": 0.0
+  },
+  "selarl": {
+   "s1": 0.0,
+   "pool": 0.0
+  },
+  "scm": {
+   "s1": 0.0,
+   "pool": 0.0
+  },
+  "gie": {
+   "s1": 0.0,
+   "pool": 0.0
+  },
+  "ei": {
+   "s1": 0.0162,
+   "pool": 0.01
+  },
+  "eirl": {
+   "s1": 0.0,
+   "pool": 0.0
+  },
+  "societe": {
+   "s1": 0.0157,
+   "pool": 0.0136
+  },
+  "ste": {
+   "s1": 0.0001,
+   "pool": 0.0001
+  },
+  "ets": {
+   "s1": 0.0205,
+   "pool": 0.0188
+  },
+  "etablissements": {
+   "s1": 0.0208,
+   "pool": 0.0189
+  },
+  "cie": {
+   "s1": 0.0219,
+   "pool": 0.0252
+  },
+  "compagnie": {
+   "s1": 0.0135,
+   "pool": 0.0122
+  },
+  "and": {
+   "s1": 0.0595,
+   "pool": 0.058
+  },
+  "et": {
+   "s1": 0.0001,
+   "pool": 0.0106
+  },
+  "company": {
+   "s1": 0.0003,
+   "pool": 0.0009
+  },
+  "co": {
+   "s1": 0.0,
+   "pool": 0.0
+  },
+  "freres": {
+   "s1": 0.0198,
+   "pool": 0.0151
+  },
+  "fils": {
+   "s1": 0.0196,
+   "pool": 0.0304
+  },
+  "groupe": {
+   "s1": 0.008,
+   "pool": 0.0375
+  },
+  "group": {
+   "s1": 0.0,
+   "pool": 0.0001
+  },
+  "france": {
+   "s1": 0.0801,
+   "pool": 0.0972
+  },
+  "llc": {
+   "s1": 0.0,
+   "pool": 0.0
+  },
+  "inc": {
+   "s1": 0.0,
+   "pool": 0.0
+  },
+  "limited": {
+   "s1": 0.0,
+   "pool": 0.0
+  }
+ },
+ "addr_token_share_france": {
+  "rue": {
+   "s1": 0.6582,
+   "pool": 0.3886
+  },
+  "r": {
+   "s1": 0.0002,
+   "pool": 0.2486
+  },
+  "avenue": {
+   "s1": 0.1194,
+   "pool": 0.0816
+  },
+  "av": {
+   "s1": 0.0085,
+   "pool": 0.0384
+  },
+  "ave": {
+   "s1": 0.0,
+   "pool": 0.0
+  },
+  "boulevard": {
+   "s1": 0.0359,
+   "pool": 0.0244
+  },
+  "bd": {
+   "s1": 0.0076,
+   "pool": 0.0162
+  },
+  "blvd": {
+   "s1": 0.0,
+   "pool": 0.0
+  },
+  "bld": {
+   "s1": 0.0,
+   "pool": 0.0001
+  },
+  "chemin": {
+   "s1": 0.0141,
+   "pool": 0.0081
+  },
+  "ch": {
+   "s1": 0.0,
+   "pool": 0.0049
+  },
+  "che": {
+   "s1": 0.0,
+   "pool": 0.0
+  },
+  "route": {
+   "s1": 0.0171,
+   "pool": 0.0094
+  },
+  "rte": {
+   "s1": 0.0015,
+   "pool": 0.0081
+  },
+  "place": {
+   "s1": 0.0126,
+   "pool": 0.007
+  },
+  "pl": {
+   "s1": 0.0037,
+   "pool": 0.0083
+  },
+  "impasse": {
+   "s1": 0.0198,
+   "pool": 0.0111
+  },
+  "imp": {
+   "s1": 0.0008,
+   "pool": 0.0084
+  },
+  "allee": {
+   "s1": 0.0464,
+   "pool": 0.028
+  },
+  "all": {
+   "s1": 0.0025,
+   "pool": 0.018
+  },
+  "quai": {
+   "s1": 0.0076,
+   "pool": 0.0043
+  },
+  "cours": {
+   "s1": 0.0084,
+   "pool": 0.0046
+  },
+  "faubourg": {
+   "s1": 0.002,
+   "pool": 0.0018
+  },
+  "fbg": {
+   "s1": 0.0,
+   "pool": 0.0
+  },
+  "cedex": {
+   "s1": 0.0001,
+   "pool": 0.0001
+  },
+  "bp": {
+   "s1": 0.0009,
+   "pool": 0.0006
+  },
+  "cs": {
+   "s1": 0.0003,
+   "pool": 0.0002
+  },
+  "st": {
+   "s1": 0.0,
+   "pool": 0.0
+  },
+  "street": {
+   "s1": 0.0005,
+   "pool": 0.017
+  },
+  "saint": {
+   "s1": 0.0998,
+   "pool": 0.0792
+  },
+  "ste": {
+   "s1": 0.0,
+   "pool": 0.0
+  },
+  "suite": {
+   "s1": 0.0004,
+   "pool": 0.0003
+  },
+  "sainte": {
+   "s1": 0.0048,
+   "pool": 0.0043
+  },
+  "dr": {
+   "s1": 0.0,
+   "pool": 0.0
+  },
+  "drive": {
+   "s1": 0.0001,
+   "pool": 0.0001
+  },
+  "ct": {
+   "s1": 0.0,
+   "pool": 0.0
+  },
+  "court": {
+   "s1": 0.0001,
+   "pool": 0.0
+  },
+  "ln": {
+   "s1": 0.0,
+   "pool": 0.0
+  },
+  "lane": {
+   "s1": 0.0,
+   "pool": 0.0
+  },
+  "no": {
+   "s1": 0.0,
+   "pool": 0.0658
+  },
+  "bis": {
+   "s1": 0.0431,
+   "pool": 0.0327
+  },
+  "ter": {
+   "s1": 0.0066,
+   "pool": 0.005
+  },
+  "zi": {
+   "s1": 0.0,
+   "pool": 0.0
+  },
+  "za": {
+   "s1": 0.0,
+   "pool": 0.0
+  },
+  "zac": {
+   "s1": 0.0,
+   "pool": 0.0
+  },
+  "lieu": {
+   "s1": 0.0001,
+   "pool": 0.0001
+  },
+  "dit": {
+   "s1": 0.0002,
+   "pool": 0.0001
+  },
+  "residence": {
+   "s1": 0.0051,
+   "pool": 0.0034
+  },
+  "res": {
+   "s1": 0.0004,
+   "pool": 0.0009
+  },
+  "batiment": {
+   "s1": 0.0016,
+   "pool": 0.0011
+  },
+  "bat": {
+   "s1": 0.0013,
+   "pool": 0.001
+  },
+  "etage": {
+   "s1": 0.0031,
+   "pool": 0.0021
+  }
+ },
+ "note": "shares are per-record document frequencies after the reference normalizer; 'street' / 'suite' / 'drive' / 'court' in France rows can only come from ADDR_ABBREV (st->street, ste->suite, dr->drive, ct->court) or from genuine English words.",
+ "raw_collision_hits_share": {
+  "pool|addr|ave": 0.0151,
+  "pool|addr|co": 0.0001,
+  "pool|addr|ct": 0.0,
+  "pool|addr|dr": 0.0001,
+  "pool|addr|ln": 0.0,
+  "pool|addr|st": 0.0175,
+  "pool|addr|ste": 0.0003,
+  "pool|name|co": 0.001,
+  "s1|addr|co": 0.0001,
+  "s1|addr|ct": 0.0,
+  "s1|addr|dr": 0.0002,
+  "s1|addr|st": 0.0013,
+  "s1|addr|ste": 0.0004,
+  "s1|name|co": 0.0003
+ },
+ "raw_collision_examples": {
+  "s1st": "1 rue Jodelle, 44600 ST NAZAIRE, Saint-Nazaire, Pays de la Loire",
+  "s1ste": "18 Rue de la Republique Ste Marie, Pornic, Pays de la Loire",
+  "s1co": "1 PL de Verdun, Co Aceml Faculte de Medecine de Lille, Lille, Hauts-de-France",
+  "s1dr": "87 AV du Dr Albert Schweitzer, ICMCB-CNRS, Pessac, Nouvelle-Aquitaine",
+  "s1ct": "1 RUE Santos Dumont, batiment CT 3 appartement 17, Calais, Hauts-de-France",
+  "poolst": "NO. 46 RUE DES SAPHIIS, ST-HERBLAIN",
+  "poolave": "10 AVE MARCEL THIL, NANTES, Pays de la Loire",
+  "poolste": "57 R. JEAN MOULIN STE MARIE, Pornic",
+  "poolco": "9 RUE PIERRE LATÉCOÈE, BORDEAUX",
+  "pooldr": "61 RUE DE LA DRÈVE, LILLE, Hauts-de-France",
+  "poolct": "30 CTÉ DILLIES PIAT, 57 RUE DE ROCROI, ROUBAIX",
+  "poolln": "Nouvelle-Aquitaine, BORDEAUX, 27 RUE DES LNÈGES"
+ },
+ "france_s1_nonascii_not_nfkd_ascii": {
+  "é": 83036,
+  "è": 29021,
+  "É": 13435,
+  "’": 2091,
+  "ç": 1839,
+  "ê": 1254,
+  "â": 929,
+  "ë": 625,
+  "ô": 617,
+  "ï": 319,
+  "à": 271,
+  "î": 194,
+  "û": 166,
+  "ü": 73,
+  "Î": 69,
+  "Œ": 30,
+  "À": 12,
+  "ù": 10,
+  "ö": 5,
+  "": 2
+ },
+ "top_pool_name_tokens_rare_in_s1": [
+  [
+   "s",
+   64195,
+   8
+  ],
+  [
+   "a",
+   61856,
+   52
+  ],
+  [
+   "com",
+   49766,
+   18
+  ],
+  [
+   "developpement",
+   48027,
+   815
+  ],
+  [
+   "international",
+   34553,
+   203
+  ],
+  [
+   "participations",
+   34280,
+   1
+  ],
+  [
+   "distribution",
+   34208,
+   64
+  ],
+  [
+   "holding",
+   33983,
+   17
+  ],
+  [
+   "l",
+   23475,
+   9
+  ],
+  [
+   "r",
+   23460,
+   6
+  ],
+  [
+   "u",
+   17399,
+   2
+  ],
+  [
+   "et",
+   15251,
+   17
+  ],
+  [
+   "snc",
+   14763,
+   1
+  ],
+  [
+   "e",
+   12704,
+   7
+  ],
+  [
+   "associes",
+   10615,
+   25
+  ],
+  [
+   "i",
+   8105,
+   1
+  ],
+  [
+   "c",
+   7633,
+   5
+  ],
+  [
+   "dba",
+   3012,
+   0
+  ],
+  [
+   "formerly",
+   2208,
+   0
+  ],
+  [
+   "k",
+   2080,
+   0
+  ],
+  [
+   "d",
+   1991,
+   4
+  ],
+  [
+   "b",
+   1973,
+   2
+  ],
+  [
+   "n",
+   1637,
+   2
+  ],
+  [
+   "trading",
+   1402,
+   2
+  ],
+  [
+   "frs",
+   1391,
+   3
+  ]
+ ],
+ "top_s1_name_tokens_rare_in_pool": [],
+ "top_pool_addr_tokens_rare_in_s1": [
+  [
+   "r",
+   356767,
+   52
+  ],
+  [
+   "nord",
+   151677,
+   200
+  ],
+  [
+   "gironde",
+   150701,
+   62
+  ],
+  [
+   "atlantique",
+   127095,
+   49
+  ],
+  [
+   "no",
+   94415,
+   1
+  ],
+  [
+   "n",
+   70406,
+   66
+  ],
+  [
+   "pas",
+   28850,
+   179
+  ],
+  [
+   "all",
+   25821,
+   655
+  ],
+  [
+   "street",
+   24418,
+   140
+  ],
+  [
+   "imp",
+   12006,
+   220
+  ],
+  [
+   "rte",
+   11593,
+   398
+  ],
+  [
+   "ch",
+   7065,
+   8
+  ],
+  [
+   "crs",
+   4520,
+   3
+  ],
+  [
+   "q",
+   4310,
+   37
+  ]
+ ],
+ "top_s1_addr_tokens_rare_in_pool": [],
+ "top_france_s1_name_tokens": [
+  [
+   "sarl",
+   73486
+  ],
+  [
+   "sas",
+   52278
+  ],
+  [
+   "club",
+   22672
+  ],
+  [
+   "france",
+   20793
+  ],
+  [
+   "de",
+   17268
+  ],
+  [
+   "eurl",
+   16980
+  ],
+  [
+   "ecole",
+   15668
+  ],
+  [
+   "and",
+   15448
+  ],
+  [
+   "amicale",
+   14389
+  ],
+  [
+   "comite",
+   13832
+  ],
+  [
+   "sa",
+   12766
+  ],
+  [
+   "maison",
+   10839
+  ],
+  [
+   "du",
+   10728
+  ],
+  [
+   "sasu",
+   10721
+  ],
+  [
+   "centre",
+   10518
+  ],
+  [
+   "union",
+   8630
+  ],
+  [
+   "sci",
+   8360
+  ],
+  [
+   "sportive",
+   8234
+  ],
+  [
+   "des",
+   7835
+  ],
+  [
+   "college",
+   7059
+  ],
+  [
+   "amis",
+   6915
+  ],
+  [
+   "primaire",
+   6716
+  ],
+  [
+   "federation",
+   6670
+  ],
+  [
+   "pharmacie",
+   5962
+  ],
+  [
+   "cie",
+   5680
+  ],
+  [
+   "sante",
+   5623
+  ],
+  [
+   "saint",
+   5611
+  ],
+  [
+   "etablissements",
+   5391
+  ],
+  [
+   "la",
+   5379
+  ],
+  [
+   "parents",
+   5319
+  ]
+ ],
+ "top_france_pool_name_tokens": [
+  [
+   "sarl",
+   298035
+  ],
+  [
+   "sas",
+   200604
+  ],
+  [
+   "france",
+   139457
+  ],
+  [
+   "club",
+   106695
+  ],
+  [
+   "de",
+   83880
+  ],
+  [
+   "eurl",
+   83815
+  ],
+  [
+   "and",
+   83253
+  ],
+  [
+   "ecole",
+   72260
+  ],
+  [
+   "sa",
+   69506
+  ],
+  [
+   "amicale",
+   69239
+  ],
+  [
+   "comite",
+   66932
+  ],
+  [
+   "s",
+   64195
+  ],
+  [
+   "sasu",
+   62893
+  ],
+  [
+   "a",
+   61856
+  ],
+  [
+   "sci",
+   55270
+  ],
+  [
+   "groupe",
+   53876
+  ],
+  [
+   "du",
+   52695
+  ],
+  [
+   "maison",
+   51879
+  ],
+  [
+   "com",
+   49766
+  ],
+  [
+   "developpement",
+   48027
+  ],
+  [
+   "centre",
+   47866
+  ],
+  [
+   "fils",
+   43554
+  ],
+  [
+   "union",
+   42497
+  ],
+  [
+   "sportive",
+   38633
+  ],
+  [
+   "des",
+   38475
+  ],
+  [
+   "cie",
+   36127
+  ],
+  [
+   "international",
+   34553
+  ],
+  [
+   "participations",
+   34280
+  ],
+  [
+   "distribution",
+   34208
+  ],
+  [
+   "holding",
+   33983
+  ]
+ ],
+ "skeleton_examples": {
+  "boulangerie": "PLNKR",
+  "boulanger": "PLNKR",
+  "chez": "S",
+  "cheese": "S",
+  "champs": "SMPS",
+  "shams": "SMS",
+  "societe": "SKT",
+  "saint": "SNT",
+  "sainte": "SNT",
+  "street": "STRT",
+  "suite": "ST",
+  "rue": "R",
+  "roux": "RKS",
+  "renault": "RNLT",
+  "reno": "RN",
+  "gauthier": "KTR",
+  "gautier": "KTR",
+  "jacques": "SKS",
+  "jack": "SK",
+  "zak": "SK"
+ }
+}

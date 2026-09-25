@@ -1,0 +1,459 @@
+{
+ "n_pool": 10320219,
+ "cap_0.002": 20640,
+ "n_distinct": {
+  "NT": 1432434,
+  "SK": 439495,
+  "AT": 639526
+ },
+ "n_capped_keys": {
+  "NT": 261,
+  "SK": 277,
+  "AT": 454
+ },
+ "top_SK_df": [
+  [
+   "LMT",
+   2621103
+  ],
+  [
+   "PRPT",
+   2094803
+  ],
+  [
+   "LK",
+   1159618
+  ],
+  [
+   "NT",
+   1015897
+  ],
+  [
+   "NKRPRT",
+   895557
+  ],
+  [
+   "KNTR",
+   450431
+  ],
+  [
+   "KM",
+   431246
+  ],
+  [
+   "KRPRTN",
+   409618
+  ],
+  [
+   "LP",
+   360712
+  ],
+  [
+   "KMPN",
+   354856
+  ],
+  [
+   "KR",
+   334053
+  ],
+  [
+   "PRTNRS",
+   321793
+  ],
+  [
+   "SRPKS",
+   320153
+  ],
+  [
+   "KRP",
+   307837
+  ],
+  [
+   "ST",
+   253148
+  ],
+  [
+   "PK",
+   234270
+  ],
+  [
+   "PR",
+   228664
+  ],
+  [
+   "SR",
+   219205
+  ],
+  [
+   "LTNKS",
+   197957
+  ],
+  [
+   "PL",
+   193239
+  ],
+  [
+   "LT",
+   190557
+  ],
+  [
+   "PLK",
+   172228
+  ],
+  [
+   "PT",
+   166920
+  ],
+  [
+   "SKTS",
+   159496
+  ],
+  [
+   "SMT",
+   150008
+  ]
+ ],
+ "top_AT_df": [
+  [
+   "road",
+   2068476
+  ],
+  [
+   "no",
+   1837732
+  ],
+  [
+   "street",
+   1495677
+  ],
+  [
+   "drive",
+   1022851
+  ],
+  [
+   "avenue",
+   854669
+  ],
+  [
+   "1",
+   763399
+  ],
+  [
+   "a",
+   727443
+  ],
+  [
+   "new",
+   677580
+  ],
+  [
+   "city",
+   650579
+  ],
+  [
+   "2",
+   641543
+  ],
+  [
+   "floor",
+   599867
+  ],
+  [
+   "c",
+   585373
+  ],
+  [
+   "nagar",
+   554945
+  ],
+  [
+   "delhi",
+   535365
+  ],
+  [
+   "b",
+   532466
+  ]
+ ],
+ "romanization_by_script": {
+  "DEVANAGARI": {
+   "n": 312725,
+   "tok_eq": 0.8518,
+   "sk_eq": 0.98,
+   "tok_eq_uncapped": 0.2828,
+   "sk_eq_uncapped": 0.057,
+   "addr_uncapped": 0.9074,
+   "name_uncapped_any": 0.3162,
+   "silent_name_and_addr": 0.0631,
+   "addr_empty_or_null": 0.0014
+  },
+  "TELUGU": {
+   "n": 45620,
+   "tok_eq": 0.9281,
+   "sk_eq": 0.9918,
+   "tok_eq_uncapped": 0.2805,
+   "sk_eq_uncapped": 0.0468,
+   "addr_uncapped": 0.9372,
+   "name_uncapped_any": 0.3146,
+   "silent_name_and_addr": 0.0435,
+   "addr_empty_or_null": 0.0017
+  },
+  "KANNADA": {
+   "n": 43379,
+   "tok_eq": 0.9295,
+   "sk_eq": 0.9918,
+   "tok_eq_uncapped": 0.2761,
+   "sk_eq_uncapped": 0.0492,
+   "addr_uncapped": 0.8593,
+   "name_uncapped_any": 0.3111,
+   "silent_name_and_addr": 0.0975,
+   "addr_empty_or_null": 0.0014
+  },
+  "TAMIL": {
+   "n": 39252,
+   "tok_eq": 0.2355,
+   "sk_eq": 0.9911,
+   "tok_eq_uncapped": 0.1229,
+   "sk_eq_uncapped": 0.0571,
+   "addr_uncapped": 0.8968,
+   "name_uncapped_any": 0.1765,
+   "silent_name_and_addr": 0.0851,
+   "addr_empty_or_null": 0.0014
+  },
+  "BENGALI": {
+   "n": 35910,
+   "tok_eq": 0.9182,
+   "sk_eq": 0.9898,
+   "tok_eq_uncapped": 0.2427,
+   "sk_eq_uncapped": 0.0618,
+   "addr_uncapped": 0.889,
+   "name_uncapped_any": 0.2898,
+   "silent_name_and_addr": 0.0784,
+   "addr_empty_or_null": 0.0013
+  },
+  "GUJARATI": {
+   "n": 35819,
+   "tok_eq": 0.8512,
+   "sk_eq": 0.9822,
+   "tok_eq_uncapped": 0.2767,
+   "sk_eq_uncapped": 0.0575,
+   "addr_uncapped": 0.9124,
+   "name_uncapped_any": 0.3098,
+   "silent_name_and_addr": 0.0616,
+   "addr_empty_or_null": 0.0015
+  },
+  "MALAYALAM": {
+   "n": 21930,
+   "tok_eq": 0.3641,
+   "sk_eq": 0.9897,
+   "tok_eq_uncapped": 0.176,
+   "sk_eq_uncapped": 0.0449,
+   "addr_uncapped": 0.9858,
+   "name_uncapped_any": 0.2188,
+   "silent_name_and_addr": 0.0104,
+   "addr_empty_or_null": 0.0014
+  },
+  "ORIYA": {
+   "n": 8681,
+   "tok_eq": 0.913,
+   "sk_eq": 0.9883,
+   "tok_eq_uncapped": 0.2682,
+   "sk_eq_uncapped": 0.0581,
+   "addr_uncapped": 0.9916,
+   "name_uncapped_any": 0.3026,
+   "silent_name_and_addr": 0.0044,
+   "addr_empty_or_null": 0.0018
+  },
+  "GURMUKHI": {
+   "n": 7924,
+   "tok_eq": 0.2253,
+   "sk_eq": 0.9673,
+   "tok_eq_uncapped": 0.1604,
+   "sk_eq_uncapped": 0.0569,
+   "addr_uncapped": 0.9972,
+   "name_uncapped_any": 0.2048,
+   "silent_name_and_addr": 0.0011,
+   "addr_empty_or_null": 0.0013
+  }
+ },
+ "romanization_all": {
+  "n": 551240,
+  "tok_eq": 0.7972,
+  "sk_eq": 0.9838,
+  "tok_eq_uncapped": 0.2615,
+  "sk_eq_uncapped": 0.0554,
+  "addr_uncapped": 0.9102,
+  "name_uncapped_any": 0.2979,
+  "silent_name_and_addr": 0.0628,
+  "addr_empty_or_null": 0.0014
+ },
+ "dictionary_fit80": {
+  "n_pairs_fit": 441175,
+  "n_entries": 446,
+  "entries_supported_by_one_s1_entity": 0,
+  "entries_whose_target_token_is_capped(generic)": 297
+ },
+ "dictionary_eval_hold20": {
+  "n": 110065,
+  "tok_eq_nodict": 0.7976,
+  "tok_eq_dict": 0.9987,
+  "tok_eq_uncapped_nodict": 0.2598,
+  "tok_eq_uncapped_dict": 0.6063
+ },
+ "evidence_20k_sample": {
+  "all": {
+   "n": 69260,
+   "EN": 0.2829,
+   "NT_uncapped": 0.7404,
+   "SK_uncapped": 0.4917,
+   "NP_uncapped": 0.8193,
+   "AT_uncapped": 0.9268,
+   "AT_df_le_1000": 0.6614,
+   "name_any_uncapped(EN|NT|SK|NP)": 0.8627,
+   "name_silent_and_AT_uncapped": 0.1303,
+   "no_evidence_at_all(excl NG,PH,NC,AB)": 0.007,
+   "cross_key_SKxAT": 0.8496,
+   "EN_only_name_evidence": 0.0006
+  },
+  "chain=>=10": {
+   "n": 12335,
+   "EN": 0.2438,
+   "NT_uncapped": 0.462,
+   "SK_uncapped": 0.1991,
+   "NP_uncapped": 0.6816,
+   "AT_uncapped": 0.9273,
+   "AT_df_le_1000": 0.661,
+   "name_any_uncapped(EN|NT|SK|NP)": 0.7357,
+   "name_silent_and_AT_uncapped": 0.2475,
+   "no_evidence_at_all(excl NG,PH,NC,AB)": 0.0168,
+   "cross_key_SKxAT": 0.8653,
+   "EN_only_name_evidence": 0.0024
+  },
+  "country=US": {
+   "n": 41443,
+   "EN": 0.3104,
+   "NT_uncapped": 0.7638,
+   "SK_uncapped": 0.5712,
+   "NP_uncapped": 0.8535,
+   "AT_uncapped": 0.942,
+   "AT_df_le_1000": 0.6589,
+   "name_any_uncapped(EN|NT|SK|NP)": 0.899,
+   "name_silent_and_AT_uncapped": 0.0991,
+   "no_evidence_at_all(excl NG,PH,NC,AB)": 0.002,
+   "cross_key_SKxAT": 0.8611,
+   "EN_only_name_evidence": 0.001
+  },
+  "pool_latin": {
+   "n": 64322,
+   "EN": 0.304,
+   "NT_uncapped": 0.7768,
+   "SK_uncapped": 0.5248,
+   "NP_uncapped": 0.8599,
+   "AT_uncapped": 0.9277,
+   "AT_df_le_1000": 0.6643,
+   "name_any_uncapped(EN|NT|SK|NP)": 0.8989,
+   "name_silent_and_AT_uncapped": 0.0974,
+   "no_evidence_at_all(excl NG,PH,NC,AB)": 0.0037,
+   "cross_key_SKxAT": 0.8455,
+   "EN_only_name_evidence": 0.0007
+  },
+  "pool_addr_present": {
+   "n": 66228,
+   "EN": 0.2801,
+   "NT_uncapped": 0.735,
+   "SK_uncapped": 0.4873,
+   "NP_uncapped": 0.8134,
+   "AT_uncapped": 0.9692,
+   "AT_df_le_1000": 0.6917,
+   "name_any_uncapped(EN|NT|SK|NP)": 0.8571,
+   "name_silent_and_AT_uncapped": 0.1363,
+   "no_evidence_at_all(excl NG,PH,NC,AB)": 0.0066,
+   "cross_key_SKxAT": 0.8884,
+   "EN_only_name_evidence": 0.0006
+  },
+  "chain=2-9": {
+   "n": 15343,
+   "EN": 0.2887,
+   "NT_uncapped": 0.7181,
+   "SK_uncapped": 0.4488,
+   "NP_uncapped": 0.8042,
+   "AT_uncapped": 0.9256,
+   "AT_df_le_1000": 0.6589,
+   "name_any_uncapped(EN|NT|SK|NP)": 0.8605,
+   "name_silent_and_AT_uncapped": 0.1319,
+   "no_evidence_at_all(excl NG,PH,NC,AB)": 0.0076,
+   "cross_key_SKxAT": 0.8424,
+   "EN_only_name_evidence": 0.0003
+  },
+  "chain=1": {
+   "n": 41582,
+   "EN": 0.2924,
+   "NT_uncapped": 0.8312,
+   "SK_uncapped": 0.5943,
+   "NP_uncapped": 0.8658,
+   "AT_uncapped": 0.9271,
+   "AT_df_le_1000": 0.6624,
+   "name_any_uncapped(EN|NT|SK|NP)": 0.9012,
+   "name_silent_and_AT_uncapped": 0.095,
+   "no_evidence_at_all(excl NG,PH,NC,AB)": 0.0039,
+   "cross_key_SKxAT": 0.8475,
+   "EN_only_name_evidence": 0.0002
+  },
+  "country=India": {
+   "n": 27817,
+   "EN": 0.242,
+   "NT_uncapped": 0.7055,
+   "SK_uncapped": 0.3732,
+   "NP_uncapped": 0.7684,
+   "AT_uncapped": 0.9041,
+   "AT_df_le_1000": 0.6651,
+   "name_any_uncapped(EN|NT|SK|NP)": 0.8086,
+   "name_silent_and_AT_uncapped": 0.1769,
+   "no_evidence_at_all(excl NG,PH,NC,AB)": 0.0145,
+   "cross_key_SKxAT": 0.8323,
+   "EN_only_name_evidence": 0.0
+  },
+  "pool_indic": {
+   "n": 4938,
+   "EN": 0.0079,
+   "NT_uncapped": 0.2657,
+   "SK_uncapped": 0.061,
+   "NP_uncapped": 0.291,
+   "AT_uncapped": 0.9145,
+   "AT_df_le_1000": 0.6235,
+   "name_any_uncapped(EN|NT|SK|NP)": 0.3913,
+   "name_silent_and_AT_uncapped": 0.5591,
+   "no_evidence_at_all(excl NG,PH,NC,AB)": 0.0496,
+   "cross_key_SKxAT": 0.9026,
+   "EN_only_name_evidence": 0.0
+  },
+  "pool_addr_empty_or_null": {
+   "n": 3032,
+   "EN": 0.344,
+   "NT_uncapped": 0.8582,
+   "SK_uncapped": 0.5884,
+   "NP_uncapped": 0.9482,
+   "AT_uncapped": 0.0,
+   "AT_df_le_1000": 0.0,
+   "name_any_uncapped(EN|NT|SK|NP)": 0.9848,
+   "name_silent_and_AT_uncapped": 0.0,
+   "no_evidence_at_all(excl NG,PH,NC,AB)": 0.0152,
+   "cross_key_SKxAT": 0.0,
+   "EN_only_name_evidence": 0.0003
+  }
+ },
+ "cross_key_union_upper_bound_sum_df": {
+  "all_queries": {
+   "mean": 5718.78535,
+   "p50": 1174.5,
+   "p90": 19446.100000000002,
+   "p99": 47317.81999999987
+  },
+  "chain_ge10_queries": {
+   "mean": 9978.545885634589,
+   "p50": 3333.0,
+   "p90": 29089.199999999997,
+   "p99": 55221.95999999998
+  }
+ }
+}

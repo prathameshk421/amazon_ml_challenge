@@ -1,0 +1,119 @@
+{
+ "cap": 19939,
+ "france_s1_chain_ge10_share": 0.11094923145707106,
+ "top_chains": [
+  [
+   "bordeaux club sarl",
+   205
+  ],
+  [
+   "nantes club sarl",
+   157
+  ],
+  [
+   "lille club sarl",
+   147
+  ],
+  [
+   "lille club sas",
+   122
+  ],
+  [
+   "bordeaux club sas",
+   118
+  ],
+  [
+   "nantes club sas",
+   117
+  ],
+  [
+   "bordeaux amicale sarl",
+   116
+  ],
+  [
+   "lille ecole sarl",
+   100
+  ],
+  [
+   "bordeaux ecole sarl",
+   98
+  ],
+  [
+   "bordeaux comite sarl",
+   97
+  ],
+  [
+   "bordeaux amicale sas",
+   96
+  ],
+  [
+   "nantes ecole sarl",
+   95
+  ],
+  [
+   "nantes amicale sarl",
+   92
+  ],
+  [
+   "nantes comite sarl",
+   89
+  ],
+  [
+   "lille amicale sarl",
+   85
+  ]
+ ],
+ "chain_token_df_france_pool_names": {
+  "amicale": 69239,
+  "amis": 33106,
+  "bordeaux": 26232,
+  "calais": 9919,
+  "clinique": 12214,
+  "club": 106695,
+  "college": 32827,
+  "comite": 66932,
+  "de": 83880,
+  "dunkerque": 10838,
+  "ecole": 72260,
+  "jean": 8409,
+  "lille": 21512,
+  "lycee": 23441,
+  "maison": 51879,
+  "nantes": 22761,
+  "parents": 25230,
+  "pharmacie": 27393,
+  "roubaix": 10531,
+  "sante": 24920,
+  "sarl": 298035,
+  "sas": 200604,
+  "sportive": 38633,
+  "tourcoing": 11100
+ },
+ "chain_token_df_france_pool_addrs": {
+  "amicale": 0,
+  "amis": 68,
+  "bordeaux": 233153,
+  "calais": 84686,
+  "clinique": 131,
+  "club": 147,
+  "college": 847,
+  "comite": 39,
+  "de": 665941,
+  "dunkerque": 93766,
+  "ecole": 951,
+  "jean": 36759,
+  "lille": 185308,
+  "lycee": 512,
+  "maison": 4297,
+  "nantes": 200247,
+  "parents": 0,
+  "pharmacie": 33,
+  "roubaix": 89229,
+  "sante": 212,
+  "sarl": 3,
+  "sas": 61,
+  "sportive": 5,
+  "tourcoing": 97423
+ },
+ "share_top200_chain_names_all_tokens_capped_in_france_pool_alone": 0.47
+}
