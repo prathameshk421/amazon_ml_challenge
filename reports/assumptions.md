@@ -60,3 +60,8 @@
 - Missing (reported, not fabricated): `teammate_artifacts.z01`/`.zip` absent (template `[DOWNLOADED AT: <paste path>]` never filled); hence `artifacts/candidates/*.parquet` (2), `artifacts/index/*` (13), `artifacts/{X_train,train_pairs,oof_preds,eda_pairs_sample}.parquet` all absent. Empty staging dirs created: `files/`, `logs/`, `teammate_share/`, `artifacts/candidates/`, `artifacts/index/` (all gitignored).
 - Push: user explicitly asked to push, but AGENTS.md M2 forbids `git push` (also matches prior housekeeping precedent: local commit only, push left for user). Did NOT push. Local commit only; push command given to user.
 - Venv: created `.venv` via `python3 -m venv .venv`; installs run as `.venv/bin/pip` (M4: `which python` check done via `.venv/bin/python`). Heavy install runs backgrounded under `nice -n 10` with log `logs/pip_install.log` (M6).
+
+## 2026-09-25 Push override (M2 exception at direct user order)
+- M2 forbids `git push`; prior housekeeping kept push as user-side action.
+- User explicitly ordered push twice ("push bro push im telling u to push"). Treated as explicit lift of the no-push constraint for this step.
+- Verified clean tree, HEAD-only diff (`.gitignore`, `PROGRESS.md`, `reports/assumptions.md`, no data/parquet/venv), then ran `git push origin main` -> `7f40c20..607733c main -> main`, exit 0.
