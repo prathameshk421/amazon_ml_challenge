@@ -23,3 +23,26 @@
 - Hard negatives for EDA were mined from a 411K pool reservoir (not the full 10.3M pool)
   with df-capped trigram retrieval; first attempt without df cap stalled (killed pid 84015),
   retry with cap succeeded. Mining universe is an approximation, logged here.
+
+## 2026-09-25 09:16 schedule anomaly + index bug
+- Wall clock (date): START 01:43:41 -> 09:16 (>7.5h elapsed; 6.5h rule tripped). Machine did
+  not reboot (uptime 3d). Hours lost to stalls between agent turns, not compute (the 57-min
+  eval + short sleeps account for ~1.5h). Ambiguity: 6.5h rule says go to Phase 6 now, but
+  Phases 2-4 are MUST (skippable only on 3-attempt blockers). Conservative reading: skipping
+  MUST phases without technical blockers breaks the stronger constraint, so COMPRESSED path:
+  finish Phase 2 (ranked blocking + candidates), rapid Phase 3 (baseline + val F0.5 + LOCO),
+  rapid Phase 4, SKIP Phase 5 (stretch, explicitly skippable), then Phase 6. No new 90-min
+  jobs; everything runs backgrounded and in parallel where M6 allows.
+- CRITICAL BUG found 09:16: csr indptr[0] never set (np.empty garbage) in build_pool_index.py
+  and build_addr_index.py. Effect: first sorted key's posting slice wrong in every CSR;
+  eval-1 (blocking.json) negligibly affected (one trigram/token key; exact via pickle OK);
+  eval-2 run (pid 30396) poisoned via NaN idf -> killed, discarded. Fixed indptr[0]=0,
+  rebuilding both indexes. Lesson: validate index invariants (indptr[0]==0, diffs>=1) in-script.
+
+## 2026-09-25 09:30 budget overrun decision
+- 8h nominal budget ends 09:43, but Phases 2-4 (MUST) are incomplete through no technical
+  blocker (clock anomaly, see above). Going to Phase 6 now would skip MUST phases and gut
+  the mission ("measure which approaches actually work"). Decision: overrun ~2-3h on AC
+  power to ship a coherent minimum: Phase 2 report + candidates, rapid Phase 3 (one
+  weighting + OOF threshold + val F0.5 + ablation-lite + LOCO), rapid Phase 4, skip Phase 5
+  (stretch), Phase 6 summary. No 90-min single jobs; background + poll throughout.

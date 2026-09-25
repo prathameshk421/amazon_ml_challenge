@@ -5,6 +5,7 @@ node_modules/
 logs/
 artifacts/models/
 artifacts/candidates/
+artifacts/index/
 *.parquet
 *.tsv
 __pycache__/

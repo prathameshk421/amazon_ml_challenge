@@ -1,5 +1,21 @@
 # Overnight run log
 
+## 2026-09-25 10:10 Phase 2 DONE (elapsed ~1.5h wafer-time + anomaly gap)
+- Built full-pool indexes (token/exact/trigram/metaphone + addr-token): artifacts/index/
+  (gitignored). Bugs fixed: indptr[0] unset (rebuilt+validated), npz lazy-read (materialize),
+  unicode searchsorted (dict lookup), uncapped metaphone (df cap), 5.3GB npz (exact pickled).
+- Eval (same 10K fit queries): exact 0.28/0.65; token-union 0.73/0.85 @6366 cands (too many);
+  trigram top-50 0.15 (weak alone); phon20 0.38/0.57. BK-tree k=1..4 on 200K sample:
+  pair 0.33->0.47 (full-pool BK rejected as infeasible). Automaton skipped (logged).
+- Ranked idf-union top-K: K=150 -> pair 0.9218/ent 0.9873 @1.7ms/q (chosen); K=250 +0.013
+  (tomorrow). Addr-token attribution 0.95 (hero); phonetic exclusive retrieval = 0 and
+  ranking ablation ~0 (kept in formula, harmless; matcher-feature ablation in Phase 3).
+  Missed-by-all ~5%: mostly native-script names (transliteration gap, tomorrow).
+- Candidates: artifacts/candidates/fit_sample_K150.parquet (60K) + val_K150.parquet (441K).
+  Reports: reports/blocking_report.md. Metrics: blocking.json, blocking2.json, blocking_phon.json.
+- Retries: idx build rerun (indptr), eval2 killed x2 (NaN idf, metaphone stall), gen mem
+  guard (maxtasksperchild), make_gen_lists O(n^2) (fixed), featurize preload refactor.
+
 ## 2026-09-25 02:34 Phase 1 DONE (elapsed ~50min)
 - 1a: artifacts/metrics/eda_struct.json (lengths, empties x country, dup names, top tokens)
   + normdict_evidence.json; src/normalize.py v1 (NORMALIZE_VERSION=1).
