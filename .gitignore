@@ -1,4 +1,6 @@
 student_resource/
+student_resource
+teammate_share/
 files/
 .venv/
 node_modules/
@@ -8,4 +10,7 @@ artifacts/candidates/
 artifacts/index/
 *.parquet
 *.tsv
+*.z01
+teammate_artifacts.zip
+.DS_Store
 __pycache__/

@@ -1,5 +1,5 @@
 START: Fri Sep 25 01:43:41 IST 2026
-LAST_UPDATE: Fri Sep 25 12:02:18 IST 2026
+LAST_UPDATE: Fri Sep 25 2026 (linux setup: dataset symlinked via ../data, .gitignore fixed, .venv created, pip install running, missing bundle reported; local commit only, push left for user per M2)
 HOUSEKEEPING: COMMIT DONE 3a177a5 main clean; rename plus push left for user.
 PHASE 0: DONE
 PHASE 1: DONE
