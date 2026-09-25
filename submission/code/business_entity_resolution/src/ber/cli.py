@@ -25,6 +25,10 @@ COMMANDS = {
     "candidates": ("run_candidates", "run_candidates"),
     "write-outputs": ("write_outputs", "run_write_outputs"),
     "monitor": ("monitor", "run_monitor"),
+    "match-features": ("match", "run_match_features"),
+    "match-train": ("match", "run_match_train"),
+    "match-eval": ("match", "run_match_eval"),
+    "match-predict": ("match", "run_match_predict"),
 }
 
 
@@ -58,6 +62,15 @@ def build_parser():
     c.add_argument("--set", choices=("MATCH_TRAIN", "MATCH_VALID", "HOLDOUT_TEST", "val-S1", "TEST"),
                    required=True)
     c.add_argument("--limit", type=int)
+
+    mf = parsers["match-features"]
+    mf.add_argument("--set", choices=("MATCH_TRAIN", "MATCH_VALID", "HOLDOUT_TEST", "TEST"), required=True)
+    mf.add_argument("--limit", type=int, help="first N queries only (smoke run)")
+    me = parsers["match-eval"]
+    me.add_argument("--set", choices=("MATCH_VALID", "HOLDOUT_TEST"), required=True)
+    me.add_argument("--force", action="store_true", help="re-score HOLDOUT_TEST (unchanged matcher only)")
+    for name in ("match-features", "match-train"):
+        parsers[name].add_argument("--workers", type=int, help="worker processes / LightGBM threads")
     return p
 
 
