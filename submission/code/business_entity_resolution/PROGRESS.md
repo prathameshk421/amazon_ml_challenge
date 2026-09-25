@@ -1,5 +1,5 @@
 # PROGRESS
-LAST_UPDATE: 2026-09-25T20:12:37+0530
+LAST_UPDATE: 2026-09-25T21:07:36+0530
 CURRENT: P5.2 rerank-train/cut/loco/eval — code + tests done, not yet run on real data
 ## Phases
 P0 setup + goldens + tests: DONE (Unicode 16.0.0, pins match §3.1; 86 unit tests pass incl. all 83 goldens)
@@ -48,3 +48,6 @@ P6 val-S1 (once) + test index + outputs: val-S1 eval DONE (rerank_eval_HOLDOUT_T
 - val-S1 (HOLDOUT_TEST) frozen-pipeline eval, once (rerank_eval_HOLDOUT_TEST.json): 441,363 queries, 1,528,055 true pairs, F0.5 ceiling 0.9928, entity recall 0.9984, full recall 0.9217, pair recall 0.9755, mean candidate size 5.43 (p50 5, p90 7, p99 9, max 41). Consistent with DEV_B (0.9933) and RR_CAL (0.9926) — no overfit to the tuning sets. Wall time 1831.6s (~30.5 min, 6 workers). Used val-S1 labels for scoring only, once, per split.md rule 3/4.
 - Added `src/ber/run_candidates.py` (CLI `candidates`) and `src/ber/monitor.py` (CLI `monitor`), the two P6 modules the plan's runbook names but nothing had written yet. `run_candidates` reuses `rerank.generate_candidates` (factored out of `run_rerank_eval`'s inline loop, same staleness guard) so `rerank-eval`/`candidates` share one code path; for `--set TEST` it also writes `candidates/TEST/query_stats.parquet` (n_union, n_dropped, size, max_p, p at rank 1-5, country) which `monitor.py` reads. Plan text says monitor's alarm is "written to PROGRESS.md"; a script cannot safely edit a human-maintained markdown file, so alarms go into `artifacts/metrics/monitor_test.json` (a `write_metrics` call, consistent with every other number in this pipeline) and are logged at WARNING — the operator transcribes any alarm into PROGRESS.md by hand. approved-by: n/a (plan text says "written to PROGRESS.md"; documented reasoning, no better mechanical alternative)
 - monitor.py's alarm rule (empty-list share > 3x train-covered mean) is literally undefined/trivial when the train-covered reference share is exactly 0 (any nonzero test-country empty share then "exceeds" 3*0); kept as the plan's literal rule, tested (tests/test_monitor.py), flagged here rather than silently adding a floor.
+- MATCH_VALID candidates DONE: 20,000 queries, mean size 5.42, 0 empty, 175.1s (candidates_MATCH_VALID.json).
+- MATCH_TRAIN candidates DONE: 180,000 queries, mean size 5.42, 0 empty, 938.5s (candidates_MATCH_TRAIN.json). Handed off to the matcher/training work (separate plan, teammate's LightGBM baseline) so it can start immediately without waiting on TEST.
+- candidates --set TEST is running (~2h estimate, scaled from the 441,363-query val-S1 run at 1831.6s -> 1,732,544 queries). Per user instruction (chat, 2026-09-25): any issue found while it runs goes to `reports/deferred_issues.md`, not fixed, until told otherwise.
