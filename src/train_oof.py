@@ -59,12 +59,13 @@ def main():
     y = X["label"].values.astype(int)
     groups = X["s1_id"].values
     ent = np.unique(groups)
+    entset = set(ent.tolist())
     truth = {}
     import csv
     with open(os.path.join(ROOT, "student_resource/dataset/train/train_ground_truth.tsv"),
               newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f, delimiter="\t"):
-            if row["source1_entity_id"] in set(ent.tolist()):
+            if row["source1_entity_id"] in entset:
                 m = row["matched_entity_ids"]
                 truth[row["source1_entity_id"]] = set(m.split(",")) if m else set()
     F = X[FEATURES].values.astype(np.float32)

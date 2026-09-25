@@ -57,6 +57,9 @@ def snd_cache(t):
         v = jellyfish.soundex(t)
         _SND_CACHE[t] = v
     return v
+
+
+def jacc(a, b):
     sa, sb = set(a), set(b)
     if not sa and not sb:
         return 1.0

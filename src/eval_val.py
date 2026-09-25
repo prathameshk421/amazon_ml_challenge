@@ -68,12 +68,9 @@ def apply_r4(pred, scores):
 def main():
     th = json.load(open(os.path.join(ART, "threshold.json")))
     t, t2 = th["t"], th["t2"]
-    model = pickle.load(open(os.path.join(ART, "model.pkl"), "rb"))
-    cal = pickle.load(open(os.path.join(ART, "calib.pkl"), "rb"))
-    Xv = pd.read_parquet(os.path.join(ART, "X_val.parquet"))
-    log("X_val %s" % (Xv.shape,))
-    p = cal.predict(model.predict(Xv[FEATURES].values.astype(np.float32)))
-    df = pd.DataFrame({"s1_id": Xv["s1_id"].values, "cand_id": Xv["cand_id"].values, "p": p})
+    Xv = pd.read_parquet(os.path.join(ART, "val_probs.parquet"))
+    log("val_probs %s" % (Xv.shape,))
+    df = Xv.rename(columns={"p": "p"})[["s1_id", "cand_id", "p"]]
     entities = sorted(df.s1_id.unique().tolist())
     truth = load_truth(entities)
     rules = apply_rules(df, t, t2)

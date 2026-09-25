@@ -46,3 +46,9 @@
   power to ship a coherent minimum: Phase 2 report + candidates, rapid Phase 3 (one
   weighting + OOF threshold + val F0.5 + ablation-lite + LOCO), rapid Phase 4, skip Phase 5
   (stretch), Phase 6 summary. No 90-min single jobs; background + poll throughout.
+
+## 2026-09-25 Repository housekeeping
+- Requested destination folder name: `amazon_ml_challenge`.
+- The active project root is `/Volumes/SSD/Projects/Hackathons/Amazon_ML_Challenge`; renaming the root would move a path outside the project root, so the folder was not renamed in this session.
+- No `origin` remote is configured. Project rules prohibit `git push` and remote configuration, so only the local commit is performed here; pushing requires a separate user action after the folder is renamed.
+- Initial validation used bare `python`, which was unavailable; retried with the project interpreter `./.venv/bin/python`, and Python compilation plus JSON validation passed.
