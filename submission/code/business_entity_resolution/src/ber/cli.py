@@ -51,10 +51,11 @@ def build_parser():
     s.add_argument("--quota-grid", action="store_true")
     s.add_argument("--scorer", choices=("hand", "learn"), default="hand")
 
-    parsers["rerank-eval"].add_argument("--set", choices=("DEV_B", "HOLDOUT_TEST"), required=True)
+    parsers["rerank-eval"].add_argument(
+        "--set", choices=("DEV_B", "HOLDOUT_TEST", "val-S1"), required=True)
 
     c = parsers["candidates"]
-    c.add_argument("--set", choices=("MATCH_TRAIN", "MATCH_VALID", "HOLDOUT_TEST", "TEST"),
+    c.add_argument("--set", choices=("MATCH_TRAIN", "MATCH_VALID", "HOLDOUT_TEST", "val-S1", "TEST"),
                    required=True)
     c.add_argument("--limit", type=int)
     return p

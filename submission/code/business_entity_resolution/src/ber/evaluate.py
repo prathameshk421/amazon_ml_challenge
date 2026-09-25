@@ -562,8 +562,8 @@ EXPERIMENTS = {"E1": _e1, "E2": _e2, "E3": _e3, "E3b": _e3b, "E4": _e4, "E5": _e
 def run_s1_eval(args):
     """CLI `s1-eval`: E1-E6 (plan §8; decisions written to blocking.json) or one ad-hoc evaluation."""
     lg = io_utils.get_logger(f"s1-eval_{args.exp}")
-    if args.set == "HOLDOUT_TEST":
-        raise ValueError("HOLDOUT_TEST is never used for stage-1 evaluation or tuning (R4)")
+    if args.set in ("HOLDOUT_TEST", "val-S1"):
+        raise ValueError("val-S1 is never used for stage-1 evaluation or tuning")
     if args.exp in EXPERIMENTS and args.set != ("DEV_B" if args.exp == "E6" else "DEV_A"):
         raise ValueError(f"{args.exp} runs on {'DEV_B' if args.exp == 'E6' else 'DEV_A'} (plan §8)")
     cfg = io_utils.load_config()

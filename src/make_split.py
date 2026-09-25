@@ -1,8 +1,9 @@
-"""Create fit/val split: val = 20% of train S1 entities, seed 42,
-stratified by country x {singleton, non-singleton}. Evaluated vs FULL train pool.
-LOCO folds are derived at eval time by country (fit on A, eval on B, full pool).
-Writes artifacts/split.json (+ counts to artifacts/metrics/split.json).
-Run: .venv/bin/python src/make_split.py
+"""Create the 80/20 train-S1 / validation-S1 id lists (seed 42, country x singleton).
+
+Canonical row files (same assignment) are written by
+`../data/write_s1_split.py` into `data/student_resource/dataset/train/`.
+This script only writes id lists under artifacts/ for older EDA code.
+S2 and S3 are not split; eval is always against the full train pool.
 """
 
 import csv

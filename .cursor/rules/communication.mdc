@@ -1,0 +1,8 @@
+---
+description: Plain professional English; name mechanisms and numbers. Full text in AGENTS.md.
+alwaysApply: true
+---
+
+Follow **Communication** in `amazon_ml_challenge/AGENTS.md` (workspace copy: `AGENTS.md`).
+
+Name the algorithm, library, model, or metric. Label evidence: our run / others’ paper / theory / guess. State the failure mode with a number. Write software-engineering English (blocking, recall ceiling, F0.5, S1/S2/S3). Do not use filler (leverage, ceremony, orchestration, AI-powered, robust without a number).

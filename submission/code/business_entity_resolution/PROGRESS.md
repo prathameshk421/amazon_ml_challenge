@@ -3,12 +3,12 @@ LAST_UPDATE: 2026-09-25T15:50:18+0530
 CURRENT: P3.1 build-index --split train
 ## Phases
 P0 setup + goldens + tests: DONE (Unicode 16.0.0, pins match §3.1; 86 unit tests pass incl. all 83 goldens)
-P1 ingest + splits: DONE (ingest_train.json, ingest_test.json, splits.json — all F5/F14 asserts passed; HOLDOUT_TEST 441,365)
+P1 ingest + splits: DONE (ingest_train.json, ingest_test.json; canonical S1 files are train_source1_train.tsv / train_source1_validation.tsv next to the dataset — 1,765,458 / 441,363, country × singleton; S2+S3 unsplit)
 P2 textnorm (E0) + dictionary: DONE (e0_abbrev.json adopt; translit_dict.json gate pass; normalize_train.json)
 P3 train index:
 P4 stage-1 (E1–E6):
 P5 stage-2:
-P6 HOLDOUT_TEST (once) + test index + outputs:
+P6 val-S1 (once) + test index + outputs:
 ## Results (one line each, citing a metrics json)
 - E0: address-token Jaccard of DEV_A true pairs 0.6970 → 0.7534 (+0.0564) vs random negatives +0.0012 → 11b adopted (e0_abbrev.json; maps in work/norm/abbrev_train.json)
 - Dictionary gate: DEV_A usable-token share 0.2896 → 0.4847, every script up (Tamil 0.165 → 0.553); 445 name / 888 addr entries (translit_dict.json). §5.3 cited ≈0.26 → ≈0.61 from an unrerun critique measurement; the gate rule itself passes.

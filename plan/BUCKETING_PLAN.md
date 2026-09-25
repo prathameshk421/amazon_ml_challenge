@@ -28,8 +28,9 @@ R3. Data/package rules (official problem statement): no external data, APIs, reg
     gazetteers, transliteration libraries or models; nothing downloaded at runtime. Allowed packages:
     Python stdlib, numpy, pandas, pyarrow, scipy, scikit-learn, rapidfuzz, jellyfish, lightgbm, tqdm,
     matplotlib. Nothing else. Tests use stdlib `unittest`; configs are JSON.
-R4. HOLDOUT_TEST (§5.4) is never used to fit, tune, choose thresholds or pick between designs. It is
-    evaluated once per frozen pipeline version and the result is recorded. The official test files are
+R4. val-S1 (`train_source1_validation.tsv`, also stored as HOLDOUT_TEST in query_sets.json) is never
+    used to fit, tune, choose thresholds or pick between designs. It is scored once per frozen
+    pipeline version. S2 and S3 stay the full train pool. The official test files are
     read only to build the test-pool index, run inference, write outputs, and compute unsupervised
     statistics (document frequencies, edge-token set G, mined abbreviation map, S1 chain sizes); every
     such use is logged in `reports/test_usage_log.md` (what, why, file).
@@ -322,22 +323,25 @@ token whose train-pool df ≤ cap_frac["NT"]·n_pool ("usable token"), before vs
 script. Must increase overall and must not decrease for any script (F12: expected ≈ 0.26 → ≈ 0.61).
 
 ### 5.4 Splits and query sets — FIXED
-1. `ids = sorted(train S1 entity_id)`; `mbin = min(nmatch, 6)`; strata = `country + "|" + str(mbin)`.
-2. `dev, holdout = train_test_split(ids, test_size=0.2, stratify=strata, random_state=42)`.
-   HOLDOUT_TEST = holdout (sklearn rounds the test share up: ceil(0.2 × 2,206,821) = 441,365 entities; assert it).
-3. `perm = numpy.random.default_rng(20260925).permutation(sorted(dev))`:
+Canonical TSVs (not in git): `data/student_resource/dataset/train/train_source1_train.tsv` and
+`train_source1_validation.tsv` plus matching `train_ground_truth_{train,validation}.tsv`. See
+`data/student_resource/dataset/split.md`. S2 and S3 are not split.
+1. Walk train S1 in file order. Stratum = country × {singleton if nmatch==0 else matched}.
+2. Per stratum, `random.Random(42).shuffle`; validation = `round(0.2 * n)` (441,363 rows);
+   train-S1 = the rest (1,765,458). Same assignment as `data/write_s1_split.py`.
+3. `perm = numpy.random.default_rng(20260925).permutation(sorted(train-S1 entity_id))`:
    DEV_A = perm[0:10000] (stage-1 tuning), DEV_B = perm[10000:20000] (confirmation),
    S1R_TRAIN = perm[20000:40000] (stage-1 logistic model), RR_TRAIN = perm[40000:90000] (stage-2 model),
    RR_CAL = perm[90000:110000] (stage-2 cut), MATCH_TRAIN = perm[110000:290000],
    MATCH_VALID = perm[290000:310000], DEV_REST = perm[310000:].
-   DICT_SRC = dev \ (DEV_A ∪ DEV_B).
-4. Assert pairwise disjointness and that all sets cover all 2,206,821 train S1.
-Why random, not grouped by name: F18 (random holdout reproduces the official test's name overlap for
-US/India; grouping would give 0% overlap). France has no labelled proxy; the "name unseen in dev"
-segment (§5.9) and LOCO (§5.8) are the closest train-side stand-ins.
-Rules: every model/threshold/dictionary/mined statistic uses dev data only (mining and df on the
-pool are unsupervised and include holdout-owned pool records, exactly as the test pool will include
-test-owned records). Evaluation of any set is always against the FULL train pool. Any later global
+   DICT_SRC = train-S1 \ (DEV_A ∪ DEV_B). HOLDOUT_TEST in `query_sets.json` is an alias of val-S1.
+4. Assert pairwise disjointness of the work slices plus val-S1, covering all 2,206,821 train S1.
+Why random, not grouped by name: F18 (random 20% of S1 reproduces the official test's name overlap for
+US/India; grouping would give 0% overlap). France has no labelled proxy; the "name unseen in train-S1"
+segment (§5.9) and country-holdout eval (§5.8) are the closest train-side stand-ins.
+Rules: every model/threshold/labelled statistic uses train-S1 only (mining and df on the
+pool are unsupervised and include validation-owned pool records, exactly as the test pool will include
+test-owned records). Evaluation of any set is always against the FULL train S2+S3. Any later global
 "one pool record → one owner" step must run over all train S1 queries, not only the evaluated set.
 Set → split: all train sets use train S1 + train index; TEST uses test S1 + test index.
 

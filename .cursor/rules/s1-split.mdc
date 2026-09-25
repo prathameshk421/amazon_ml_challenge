@@ -1,0 +1,18 @@
+---
+description: Train S1 vs validation S1 split. S2 and S3 stay the full pool.
+alwaysApply: true
+---
+
+# S1 split (mandatory)
+
+Canonical files are next to the original TSVs, **not** inside the git tree:
+
+`data/student_resource/dataset/train/`
+
+- `train_source1_train.tsv` + `train_ground_truth_train.tsv` — labels allowed for building/tuning
+- `train_source1_validation.tsv` + `train_ground_truth_validation.tsv` — **scoring only**
+- `train_source2.tsv` and `train_source3.tsv` — **never subset**; blocking searches the full pool for both train S1 and validation S1
+
+Write-up: `data/student_resource/dataset/split.md`. Rebuild: `python3 data/write_s1_split.py`.
+
+Do not use validation S1 ground truth to set thresholds, mine negatives, or train models.
