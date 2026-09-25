@@ -1,11 +1,11 @@
 # PROGRESS
-LAST_UPDATE: 2026-09-25T15:50:18+0530
-CURRENT: P3.1 build-index --split train
+LAST_UPDATE: 2026-09-25T18:54:18+0530
+CURRENT: P4.1 s1-eval E1 (bug gate) on real data
 ## Phases
 P0 setup + goldens + tests: DONE (Unicode 16.0.0, pins match §3.1; 86 unit tests pass incl. all 83 goldens)
-P1 ingest + splits: DONE (ingest_train.json, ingest_test.json; canonical S1 files are train_source1_train.tsv / train_source1_validation.tsv next to the dataset — 1,765,458 / 441,363, country × singleton; S2+S3 unsplit)
-P2 textnorm (E0) + dictionary: DONE (e0_abbrev.json adopt; translit_dict.json gate pass; normalize_train.json)
-P3 train index:
+P1 ingest + splits: DONE. Canonical split = teammate's data/write_s1_split.py output (train_source1_train.tsv 1,765,458 / train_source1_validation.tsv 441,363, seed 42, country×singleton strata) — this supersedes the plan's own §5.4 RNG split per AGENTS.md priority (AGENTS.md > split.md > BUCKETING_PLAN.md). splits.py reproduces it exactly (verified: computed HOLDOUT_TEST/val-S1 entity-id set == train_source1_validation.tsv, byte-for-byte). DEV_A/DEV_B/S1R_TRAIN/RR_TRAIN/RR_CAL/MATCH_TRAIN/MATCH_VALID/DEV_REST/DICT_SRC are internal work-slices drawn only from the teammate's train_ids (perm seed 20260925), so validation-S1 ground truth is never touched by tuning.
+P2 textnorm (E0) + dictionary: DONE — re-run against the corrected split (first run used a stale pre-teammate-split DEV_A/DICT_SRC, discarded; see Deviations). E0 adopt (true rise 0.0588 vs negative 0.0013). Dictionary gate 0.2701→0.4491 pass (445 name / 902 addr entries).
+P3 train index: DONE (index_train.json; 11 families incl. SK; index-sanity 3078/3078 = 1.0; rebuilt after the split correction, 805.2s)
 P4 stage-1 (E1–E6):
 P5 stage-2:
 P6 val-S1 (once) + test index + outputs:
@@ -27,3 +27,6 @@ P6 val-S1 (once) + test index + outputs:
 - E2: each candidate family tested independently as E1 set + F vs E1 set; kept set = E1 ∪ kept F; PH removal tested on the kept set; exclusive pairs = true pairs in the union reachable only via F. approved-by: user (chat, 2026-09-25)
 - E5 "best" = highest overall F0.5 ceiling among settings meeting both conditions (ties: smaller mean size). approved-by: user (chat, 2026-09-25)
 - learn-dict: a pool token counts once per distinct token per pair (as plan/critique/scripts/d_evidence.py); gate "after" recomputes train-pool df with the dictionary applied to Indic-name records. approved-by: n/a (prototype detail)
+- BLOCKER caught and fixed: a teammate published the canonical S1 train/validation split (`data/write_s1_split.py`, `data/student_resource/dataset/train/split.md`) after P1/P2 had already run once using this pipeline's own §5.4 RNG split. Under the new AGENTS.md that split is authoritative and validation-S1 labels are scoring-only. The stale run's DEV_A/DICT_SRC (used by E0 and the transliteration dictionary) were not guaranteed disjoint from the teammate's validation-S1, so both were re-run from a regenerated `splits/query_sets.json` built on the teammate's split before continuing. approved-by: user (chat, 2026-09-25, "just use my teammates split and all, forgot about ur split and start using it")
+- `data/` (the workspace's dataset copy + split script) added to `.gitignore`; dataset is read-only, never uploaded. approved-by: user (chat, 2026-09-25)
+- Bug found + fixed: `index_build.build_split_index`'s per-family resume/skip only checked structural validity of existing files, not whether the input norm pool parquet had actually changed. A `build-index` re-run after re-normalizing (e.g. after the split correction above) silently kept the stale index (observed: second run finished in 46s instead of ~805s, logging "files verify, skipped" for every family). Fixed by fingerprinting the norm pool file (size + mtime_ns, stored in meta.json as `norm_input_fingerprint`); a mismatch forces a full rebuild of every family regardless of structural validity. Re-verified: forced rebuild after the fix took 805.2s (matching the original full build) and index-sanity passed 3078/3078. approved-by: n/a (correctness bug)

@@ -23,3 +23,4 @@ output/
 artifacts/tok_idf.json
 artifacts/split.json
 artifacts/val_list.json
+data/

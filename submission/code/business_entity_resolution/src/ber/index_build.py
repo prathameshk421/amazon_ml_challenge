@@ -3,8 +3,11 @@
 Per split: G and the full AT df first, then per family: spawn workers over 250,000-row chunks produce
 (key64, pool_idx) pairs, the main process appends them to 64 shard files by key64 >> 58, then each shard
 is reduced on its own (lexsort, unique, df, build-limit drop) and the shards are concatenated in shard
-order into {F}.keys.npy / {F}.indptr.npy / {F}.post.npy (+ {F}.dropped.npy). Families whose files
-already exist and verify are skipped, so a re-run resumes.
+order into {F}.keys.npy / {F}.indptr.npy / {F}.post.npy (+ {F}.dropped.npy). A family is skipped and
+resumed from disk only if its files verify AND the input norm pool parquet has not been rewritten since
+(size + mtime_ns fingerprint stored in meta.json) -- otherwise every family is rebuilt, since a changed
+normalization (new dictionary/abbreviation map) changes every family's keys, not just the ones that
+would fail structural verification.
 """
 
 import logging
@@ -226,6 +229,14 @@ def family_stats(out_dir, F):
 
 # ---------------------------------------------------------------- split build
 
+def _pool_fingerprint(path):
+    """Cheap "was this file rewritten" check: size + mtime_ns. atomic_write_parquet always replaces the
+    file (never edits in place), so any re-normalize changes this even if the new content happens to be
+    logically identical."""
+    st = Path(path).stat()
+    return f"{st.st_size}:{st.st_mtime_ns}"
+
+
 def _iter_names(norm_pool_path):
     for b in pq.ParquetFile(norm_pool_path).iter_batches(columns=["name_norm"], batch_size=CHUNK):
         yield from b.column(0).to_pylist()
@@ -247,10 +258,15 @@ def build_split_index(norm_pool_path, out_dir, families, cfg, n_workers):
     limit = math.floor(cfg["build_df_max_frac"] * n_pool)
     chunks = [(a, min(a + CHUNK, n_pool)) for a in range(0, n_pool, CHUNK)]
     meta_path = out_dir / "meta.json"
-    old = io_utils.read_json(meta_path)["families"] if meta_path.exists() else {}
+    fp = _pool_fingerprint(norm_pool_path)
+    old_doc = io_utils.read_json(meta_path) if meta_path.exists() else {}
+    fresh = old_doc.get("norm_input_fingerprint") == fp
+    old = old_doc.get("families", {}) if fresh else {}
+    if old_doc and not fresh:
+        log.info("norm pool changed since the last build (fingerprint mismatch): rebuilding all families")
     rss = {}
     meta = {"n_pool": n_pool, "G": G, "at_cap": at_cap, "build_df_limit": limit,
-            "chunk": CHUNK, "n_shards": N_SHARDS, "families": {}}
+            "chunk": CHUNK, "n_shards": N_SHARDS, "norm_input_fingerprint": fp, "families": {}}
     with io_utils.spawn_pool(n_workers, _init_worker, (str(norm_pool_path),)) as pool:
         at_df = Counter()
         for c, pid, mb in pool.imap_unordered(_chunk_at_df, chunks):
@@ -265,7 +281,7 @@ def build_split_index(norm_pool_path, out_dir, families, cfg, n_workers):
         Gs = frozenset(G)
         for F in families:
             tf = time.time()
-            if check_family(out_dir, F, n_pool) is None:
+            if fresh and check_family(out_dir, F, n_pool) is None:
                 log.info("%s: files verify, skipped", F)
                 wall = old.get(F, {}).get("wall_s")
             else:
