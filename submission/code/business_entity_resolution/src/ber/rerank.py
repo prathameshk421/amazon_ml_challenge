@@ -300,9 +300,11 @@ def _build_row_chunk(r, idx, names, addrs, chains, per_query, shared):
 
 
 def _infer_chunk(r, idx, names, addrs, chains, per_query, shared):
-    """rerank-eval / rerank-loco worker: retrieve + stage-2 score (given booster) + cut, ordered by
-    (p desc, learn desc, pool_idx asc). per_query = [country_raw]; shared = (split, model_path,
-    feature_names, K_min, K_max, p_min)."""
+    """rerank-eval / rerank-loco / `candidates` worker: retrieve + stage-2 score (given booster) + cut,
+    ordered by (p desc, learn desc, pool_idx asc). per_query = [country_raw]; shared = (split,
+    model_path, feature_names, K_min, K_max, p_min). Also returns n_union/n_dropped (stage-1 union size
+    and postings-limit-drop count, plan §5.10 monitor.py "share of queries hitting the postings limit")
+    and max_p_at_rank (p at ranks 1-5 before the cut, padded with nan) for monitor.py; unused elsewhere."""
     split, model_path, feat_names, K_min, K_max, p_min = shared
     ptr = _pool_text_reader(split)
     booster = _booster(model_path)
@@ -315,11 +317,62 @@ def _infer_chunk(r, idx, names, addrs, chains, per_query, shared):
         p = booster.predict(X, num_threads=1) if n else np.zeros(0, dtype=np.float64)
         learn, pool_idx = res["learn"], res["pool_idx"]
         rank = rank_within_groups(np.zeros(n, dtype=np.int64), p, learn, pool_idx)
+        pre_order = np.argsort(-p, kind="stable")[:5] if n else np.zeros(0, dtype=np.int64)
+        top5_p = np.full(5, np.nan, dtype=np.float32)
+        top5_p[:pre_order.size] = p[pre_order]
         sel = np.flatnonzero(cut_select(rank, p, K_min, K_max, p_min))
         order = sel[np.lexsort((pool_idx[sel], -learn[sel], -p[sel]))]
         out.append({"s1_idx": int(s1i), "pool_idx": pool_idx[order].astype(np.uint32),
-                    "p": p[order].astype(np.float32), "rank": rank[order].astype(np.int16)})
+                    "p": p[order].astype(np.float32), "rank": rank[order].astype(np.int16),
+                    "country": country, "n_union": res["n_union"], "n_dropped": res["n_dropped"],
+                    "top5_p": top5_p})
     return out
+
+
+def generate_candidates(split, s1_idx, country_raw, cfg, model, feat_names, cut, out_dir,
+                        collect_query_stats=False):
+    """Stage-1+2 inference for a query set (plan M6+M7): reuses `_infer_chunk`/`write_candidates` so
+    `run_rerank_eval` and `ber.run_candidates.run_candidates` share one code path. Returns
+    (pool_lists, rank_lists, p_lists, query_stats_or_None); query_stats has one row per query
+    (s1_idx, country, n_union, n_dropped, size, max_p, p_rank1..5) for `monitor.py` (only collected
+    when asked, since it costs an extra pass' worth of small per-query bookkeeping)."""
+    model_path = str(io_utils.work_path("rerank", "model_v1.txt"))
+    shared = (split, model_path, feat_names, cut["K_min"], cut["K_max"], cut["p_min"])
+    pool_lists, rank_lists, p_lists = [], [], []
+    stats = [] if collect_query_stats else None
+    with retrieve.QueryRunner(split, cfg) as qr:
+        for chunk in qr.map(cfg, model, s1_idx, _infer_chunk, per_query=country_raw, shared=shared):
+            for res in chunk:
+                pool_lists.append(res["pool_idx"])
+                rank_lists.append(res["rank"])
+                p_lists.append(res["p"])
+                if collect_query_stats:
+                    stats.append((res["s1_idx"], res["country"], res["n_union"], res["n_dropped"],
+                                 res["pool_idx"].size,
+                                 float(res["top5_p"][0]) if res["pool_idx"].size else float("nan"),
+                                 *[float(x) for x in res["top5_p"]]))
+    if stats is not None:
+        stats.sort(key=lambda t: t[0])
+        stats = pa.table({
+            "s1_idx": pa.array([t[0] for t in stats], pa.int32()),
+            "country_raw": [t[1] for t in stats],
+            "n_union": pa.array([t[2] for t in stats], pa.int32()),
+            "n_dropped": pa.array([t[3] for t in stats], pa.int32()),
+            "size": pa.array([t[4] for t in stats], pa.int32()),
+            "max_p": pa.array([t[5] for t in stats], pa.float32()),
+            "p_rank1": pa.array([t[6] for t in stats], pa.float32()),
+            "p_rank2": pa.array([t[7] for t in stats], pa.float32()),
+            "p_rank3": pa.array([t[8] for t in stats], pa.float32()),
+            "p_rank4": pa.array([t[9] for t in stats], pa.float32()),
+            "p_rank5": pa.array([t[10] for t in stats], pa.float32()),
+        })
+        out_dir.mkdir(parents=True, exist_ok=True)
+        stats_path = out_dir / "query_stats.parquet"
+        tmp = stats_path.with_name(stats_path.name + ".tmp")
+        pq.write_table(stats, tmp, compression="zstd")
+        os.replace(tmp, stats_path)
+    write_candidates(out_dir.name, s1_idx, pool_lists, rank_lists, p_lists, out_dir)
+    return pool_lists, rank_lists, p_lists, stats
 
 
 # ---------------------------------------------------------------- rerank-build (plan §5.8 B)
@@ -744,17 +797,8 @@ def run_rerank_eval(args):
     if reused:
         pool_lists, rank_lists, p_lists = _read_candidates(out_dir, s1_idx)
     else:
-        model_path = str(io_utils.work_path("rerank", "model_v1.txt"))
-        shared = ("train", model_path, feat_names, cut["K_min"], cut["K_max"], cut["p_min"])
-        pool_lists, rank_lists, p_lists = [], [], []
-        with retrieve.QueryRunner("train", cfg) as qr:
-            for chunk in qr.map(cfg, model, s1_idx, _infer_chunk, per_query=country_raw[s1_idx],
-                                shared=shared):
-                for res in chunk:
-                    pool_lists.append(res["pool_idx"])
-                    rank_lists.append(res["rank"])
-                    p_lists.append(res["p"])
-        write_candidates(set_name, s1_idx, pool_lists, rank_lists, p_lists, out_dir)
+        pool_lists, rank_lists, p_lists, _ = generate_candidates(
+            "train", s1_idx, country_raw[s1_idx], cfg, model, feat_names, cut, out_dir)
 
     truth = evaluate.truth_lists(s1_idx)
     n_true = np.array([t.size for t in truth], dtype=np.int64)
