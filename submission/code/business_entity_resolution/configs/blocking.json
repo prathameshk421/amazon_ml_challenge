@@ -16,7 +16,6 @@
     "NT",
     "NG",
     "NP",
-    "PH",
     "SP",
     "NC",
     "AT",
@@ -26,7 +25,7 @@
   "build_df_max_frac": 0.005,
   "cap_frac": {
     "EN": 0.002,
-    "NT": 0.002,
+    "NT": 0.001,
     "NG": 0.0008,
     "NP": 0.002,
     "PH": 0.002,
@@ -69,15 +68,15 @@
     }
   },
   "quota": {
-    "LEARN": 300,
-    "NAME": 100,
-    "ADDR": 100,
+    "LEARN": 150,
+    "NAME": 0,
+    "ADDR": 50,
     "PAIR": 100,
-    "XK": 100,
+    "XK": 50,
     "CAT": 20
   },
   "chain_rule": {
-    "enabled": true,
+    "enabled": false,
     "min_chain": 10,
     "mult": 2,
     "channels": [
@@ -154,6 +153,78 @@
       "experiment": "E0",
       "metrics": "artifacts/metrics/e0_abbrev.json",
       "value": true
+    },
+    "families": {
+      "experiment": "E2",
+      "metrics": "artifacts/metrics/s1_E2.json",
+      "value": [
+        "EN",
+        "NT",
+        "NG",
+        "NP",
+        "SP",
+        "NC",
+        "AT",
+        "AB",
+        "XK"
+      ]
+    },
+    "cap_frac.NT": {
+      "experiment": "E3",
+      "metrics": "artifacts/metrics/s1_E3.json",
+      "value": 0.001
+    },
+    "cap_frac.NG": {
+      "experiment": "E3",
+      "metrics": "artifacts/metrics/s1_E3.json",
+      "value": 0.0008
+    },
+    "cap_frac.AT": {
+      "experiment": "E3",
+      "metrics": "artifacts/metrics/s1_E3.json",
+      "value": 0.002
+    },
+    "cap_frac.NP": {
+      "experiment": "E3",
+      "metrics": "artifacts/metrics/s1_E3.json",
+      "value": 0.002
+    },
+    "cap_frac.SP": {
+      "experiment": "E3",
+      "metrics": "artifacts/metrics/s1_E3.json",
+      "value": 0.002
+    },
+    "cap_frac.AB": {
+      "experiment": "E3",
+      "metrics": "artifacts/metrics/s1_E3.json",
+      "value": 0.002
+    },
+    "cap_frac.XK": {
+      "experiment": "E3",
+      "metrics": "artifacts/metrics/s1_E3.json",
+      "value": 0.002
+    },
+    "channels.LEARN": {
+      "experiment": "E3b",
+      "metrics": "artifacts/metrics/s1_E3b.json",
+      "value": "stage1_model"
+    },
+    "quota": {
+      "experiment": "E4",
+      "metrics": "artifacts/metrics/s1_E4.json",
+      "value": {
+        "LEARN": 150,
+        "NAME": 0,
+        "ADDR": 50,
+        "PAIR": 100,
+        "XK": 50,
+        "CAT": 20
+      }
+    },
+    "chain_rule.enabled": {
+      "experiment": "E5",
+      "metrics": "artifacts/metrics/s1_E5.json",
+      "value": false
     }
   }
 }

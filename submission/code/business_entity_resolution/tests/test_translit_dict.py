@@ -104,6 +104,9 @@ class TestEndToEnd(unittest.TestCase):
         cfg = io_utils.load_config()
         cfg["max_workers"] = 2
         cfg["abbrev_mining"]["enabled"] = True
+        # Pinned regardless of what E3 has tuned cap_frac.NT to in the real blocking.json: the fixture
+        # size (N_FILL/N_IND) is calibrated against this exact value (see the class docstring above).
+        cfg["cap_frac"]["NT"] = 0.002
         self.patch = mock.patch.object(io_utils, "load_config", return_value=cfg)
         self.patch.start()
         w = Path("work")
