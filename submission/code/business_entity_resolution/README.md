@@ -17,6 +17,12 @@ repository. Every reported number is written by a command into `artifacts/metric
 
 ## 2. Layout and conventions
 
+**Paths.** Commands below are written for the team repository, where this package lives at
+`submission/code/business_entity_resolution/`. In the submission zip it sits at
+`code/business_entity_resolution/`: unzip, put the contest data at `student_resource/dataset/` next to
+`code/`, run from that folder, and read `submission/code/` as `code/` in every command
+(e.g. `export PYTHONPATH=code/business_entity_resolution/src`).
+
 Run every command from the **repository root**, the folder that contains:
 
 ```
