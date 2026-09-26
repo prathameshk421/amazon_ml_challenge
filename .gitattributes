@@ -2,3 +2,7 @@
 *.parquet filter=lfs diff=lfs merge=lfs -text
 *.npy filter=lfs diff=lfs merge=lfs -text
 *.bin filter=lfs diff=lfs merge=lfs -text
+work/match/models/*.txt filter=lfs diff=lfs merge=lfs -text
+work/match_k5_submission1/models/*.txt filter=lfs diff=lfs merge=lfs -text
+work/rerank/*.txt filter=lfs diff=lfs merge=lfs -text
+submission/output/*.tsv filter=lfs diff=lfs merge=lfs -text
