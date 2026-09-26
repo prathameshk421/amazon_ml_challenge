@@ -25,7 +25,14 @@ is the fix — a measured table, and a mechanical check to run after every train
 | k5_feat (180,000 S1) | 975,699 | ~702,500 | 3000 | 1448, 1703, 1927, 1901, 1724 | No |
 | x1_strsim (180,000 S1) | 975,699 | ~702,500 | 3000 | 1651, 1819, 2011, 1908, 1574 | No |
 | dev_rest_180k (360,000 S1) | 1,952,601 | ~1,405,900 | 3000 | 2997, 2424, 2566, 2727, **3000** | Yes, 2 of 5 |
-| dev_rest_full (1,655,458 S1) | 8,979,983 | ~6,465,600 | 4000 | **4000**, **3998**, **3988**, (2 folds still running) | Yes, 3 of 3 so far |
+| dev_rest_full (1,655,458 S1) | 8,979,983 | ~6,465,600 | 4000 | **4000**, **3998**, **3988**, **3996**, **4000** | Yes, 5 of 5 (OOF F0.5 0.98221 reported with this caveat) |
+
+| train_final_single (1,655,458 S1, one model) | 8,979,983 | 7,633,743 | 12000 | **8208** (converged) | No |
+
+First converged measurement at MATCH_ALL scale: one model on ~7.6M fit rows at lr 0.05 needed 8208 rounds
+(`artifacts/metrics/match_train_full_single.json`, `work/logs/submission2.log`) — about 4x the 180k-S1
+runs (~2000) and 2x the 4000 cap the 5-fold MATCH_ALL run was cut at. For MATCH_ALL-scale training at
+lr 0.05, start the cap at >= 12000.
 
 Source files: `artifacts/metrics/match_train_{k5_base,k5_feat,x1_strsim}.json` (`folds[].best_iteration`),
 `work/logs/dev_rest_180k.log`, `work/logs/dev_rest_full.log`.
