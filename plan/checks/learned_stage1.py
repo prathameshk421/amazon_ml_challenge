@@ -23,7 +23,7 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, os.path.join(ROOT, "src"))
+sys.path.insert(0, os.path.join(ROOT, "legacy", "src"))
 from normalize import normalize_name, normalize_address  # noqa: E402
 from block_query2 import Q  # noqa: E402
 from diag_blocking import union_scores  # noqa: E402

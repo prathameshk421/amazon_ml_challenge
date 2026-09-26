@@ -1,4 +1,4 @@
-"""How close is stdlib romanization (src/translit.py) to the Latin S1 name, on fit-part
+"""How close is stdlib romanization (legacy/src/translit.py) to the Latin S1 name, on fit-part
 true pairs whose pool name contains Indic letters? Informs whether the rebuild needs a
 train-derived token dictionary. Writes plan/checks/romanize_quality.json.
 """
@@ -12,7 +12,7 @@ from collections import Counter
 import jellyfish
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, os.path.join(ROOT, "src"))
+sys.path.insert(0, os.path.join(ROOT, "legacy", "src"))
 from normalize import normalize_name
 from translit import romanize_words_schwa, has_indic
 

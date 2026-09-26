@@ -55,7 +55,7 @@ Row names: B = combined name+address score, N = name, A = address, P = token pai
 name; each number is that channel's top-q. The quota union reaches the same recall with 2.6× to
 4× fewer candidates than a single score.
 
-## Recommended direction (details in `bucket_prompt_v2.md`)
+## Recommended direction (details in `archive/agent_runs/bucket_prompt_v2.md`)
 1. Normalization v2: keep Indic letters and add a romanized form.
 2. Add PAIR and ROM channels.
 3. Stage-1 = per-channel quota union (~500 to 900 candidates, pair recall ~0.962 to 0.968).

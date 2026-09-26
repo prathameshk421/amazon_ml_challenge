@@ -67,8 +67,8 @@
 - DONE: `teammate_artifacts.z01` (1.9G) + `teammate_artifacts.zip` (39M); 34 files / 4.2G uncompressed, zero `student_resource` entries confirmed; pid 5401 reaped.
 
 ## 2026-09-25 Bucketing diagnostics (interactive session)
-- BUG FOUND: src/normalize.py v1 `_PUNCT_RE = [^0-9a-z\s]` deletes every non-Latin letter, so 699,389 train-pool names (Indic scripts) and 806,829 test-pool names normalize to "" (artifacts/metrics/diag_scripts.json). Not fixed yet (would require NORMALIZE_VERSION bump + re-run of dependents); documented for the next session.
-- FLAGGED FOR HUMAN: src/translit.py romanizes Indic scripts using only Python stdlib `unicodedata.name()` (e.g. 'DEVANAGARI LETTER KA' -> 'k'). No external table/model/data. Treated as standard text processing (same category as NFKD), but listed here for review.
+- BUG FOUND: legacy/src/normalize.py v1 `_PUNCT_RE = [^0-9a-z\s]` deletes every non-Latin letter, so 699,389 train-pool names (Indic scripts) and 806,829 test-pool names normalize to "" (artifacts/metrics/diag_scripts.json). Not fixed yet (would require NORMALIZE_VERSION bump + re-run of dependents); documented for the next session.
+- FLAGGED FOR HUMAN: legacy/src/translit.py romanizes Indic scripts using only Python stdlib `unicodedata.name()` (e.g. 'DEVANAGARI LETTER KA' -> 'k'). No external table/model/data. Treated as standard text processing (same category as NFKD), but listed here for review.
 - Diagnostics used fit-part queries only (same 10K seed-123 set as block_query2.py); val and test ground truth untouched.
 ## 2026-09-25 Linux setup (user-requested rearrange vs M-rules)
 - Conflict: user asked to rearrange `~/projects/amazon_ml` (dataset into a clean separate folder, clean junk, venv, push). AGENTS.md M1 limits writes to the project root; M2 forbids `ln` and `rm -rf`; M3 forbids touching `student_resource/`.

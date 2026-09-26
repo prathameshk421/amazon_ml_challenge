@@ -1,4 +1,4 @@
-# Licenses (source: artifacts/metrics/licenses.json via src/collect_licenses.py, offline pip metadata)
+# Licenses (source: artifacts/metrics/licenses.json via legacy/src/collect_licenses.py, offline pip metadata)
 
 | lib | version | license |
 |---|---|---|

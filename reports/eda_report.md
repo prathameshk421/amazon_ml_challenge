@@ -30,7 +30,7 @@ TF-IDF fit on the mine-pool only (unsupervised). Val untouched.
   ltd 769711 / pvt 509378 / llp 171312; US llc 1392833 / inc 1016567 / corp 266272 /
   co 205267 / lp 107384 / pllc 66618; honorifics sri 55080 / shri 54930 / shree 32365.
   Conclusion: legal-suffix variation is the dominant name noise; dictionary in
-  src/normalize.py v1 maps corp/inc/ltd/pvt/co/svc/assoc/bros/shri/shree (+ampersand).
+  legacy/src/normalize.py v1 maps corp/inc/ltd/pvt/co/svc/assoc/bros/shri/shree (+ampersand).
 - Address abbreviation frequencies: US rd 603394 vs road 718496, st 649210 vs street 784912,
   dr 547452, ave 450290, ln 232222, ct 197445, blvd 52038, apt 42384, ste 6942, hwy 25150,
   pkwy 15397; India near 247541, opp 130638, behind 35909, no 2547212, plot 417504.
