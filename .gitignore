@@ -62,3 +62,6 @@ artifacts/val_list.json
 *.pkl
 *.npy
 *.bin
+
+# local GPU/cloud credentials and settings; never commit
+cloud/gpu.env
