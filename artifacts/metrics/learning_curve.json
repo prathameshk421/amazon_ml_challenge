@@ -248,8 +248,8 @@
  },
  "config_hash": "94241292b8cdffae19b4574cddafde111bd9aceb",
  "norm_version": "2.1",
- "git_commit": "fd77ee792acf56b54a5694dd9e0e3950a2c9b115",
- "created_at": "2026-09-26T11:23:38+05:30",
+ "git_commit": "86c9f9bc9ce8d90007810821c644262e868895cd",
+ "created_at": "2026-09-26T12:10:57+05:30",
  "points": [
   {
    "n_queries": 45000,
@@ -329,6 +329,42 @@
    "one_owner": true,
    "wall_s": 294.0,
    "source": "match_train_x1_strsim.json (not rerun)"
+  },
+  {
+   "n_queries": 360000,
+   "n_rows": 1952601,
+   "oof_f05": 0.9794771546637513,
+   "threshold": 0.67,
+   "one_owner": true,
+   "folds": [
+    {
+     "fold": 0,
+     "best_iteration": 2997,
+     "n_fit_rows": 1405942
+    },
+    {
+     "fold": 1,
+     "best_iteration": 2424,
+     "n_fit_rows": 1406193
+    },
+    {
+     "fold": 2,
+     "best_iteration": 2566,
+     "n_fit_rows": 1405570
+    },
+    {
+     "fold": 3,
+     "best_iteration": 2727,
+     "n_fit_rows": 1405646
+    },
+    {
+     "fold": 4,
+     "best_iteration": 3000,
+     "n_fit_rows": 1405671
+    }
+   ],
+   "wall_s": 1225.6,
+   "source": "dev_rest_180k.py: MATCH_TRAIN + 180k new DEV_REST S1"
   }
  ],
  "note": "45k/90k random subsets of MATCH_TRAIN S1 (seed 42, unstratified); 180k point is x1_strsim itself, not rerun. Same 5-fold GroupKFold/LightGBM params/isotonic calibration/threshold+one_owner search as match-train. No feature rebuild, no state written to work/match/models/ or configs/match.json."
