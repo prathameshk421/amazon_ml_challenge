@@ -10,6 +10,7 @@
 | jellyfish | 1.2.1 | MIT |
 | lightgbm | 4.7.0 | MIT |
 | xgboost | NOT INSTALLED | n/a (not used) |
+| pytest | 9.1.1 | MIT (dev-only: test runner, not used in training/inference) |
 | sentence-transformers | 6.1.0 | Apache-2.0 |
 | torch | 2.14.0 | Apache-2.0 (+ LLVM-exception/BSD/BSL-1.0/MIT components) |
 | transformers | 5.17.0 | Apache 2.0 |
