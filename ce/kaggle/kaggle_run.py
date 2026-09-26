@@ -1,6 +1,6 @@
 """Kaggle kernel driver for ce_rec_base (one file, one job per kernel; see ce/kaggle/README.md).
 
-  JOB=probe | train_score | score_rest   (set by the kernel folder's copy of this file, see README)
+  JOB=probe | train_score | score_test | score_rest   (set by the kernel folder's copy of this file, see README)
 
 Inputs are found by globbing /kaggle/input (mount paths differ between Kaggle versions):
   pairs dataset   -> the folder holding pairs_MATCH_VALID.parquet and the ce/*.py scripts (flat)
@@ -45,13 +45,19 @@ def sh(*args, env=None):
     subprocess.run([sys.executable, *map(str, args)], check=True, env=env)
 
 
-def score_parallel(scripts, pairs, model, out, set_name, n_gpu):
-    """One process per GPU on row shards, then merge in pair-file order and drop the parts."""
-    procs = [subprocess.Popen([sys.executable, str(scripts / "inference.py"), "--pairs", str(pairs), "--model",
-                               str(model), "--out", str(out), "--set", set_name, "--shard", f"{k}/{n_gpu}",
-                               "--gpu", str(k)]) for k in range(n_gpu)]
-    if any(p.wait() for p in procs):
-        raise SystemExit(f"scoring {set_name} failed")
+def score_parallel(scripts, pairs, model, out, set_name, n_gpu, attempts=4):
+    """One process per GPU on row shards, then merge in pair-file order and drop the parts. A process that dies
+    (e.g. OOM-killed) is relaunched; inference.py skips chunks already written, so work is never repeated."""
+    for a in range(attempts):
+        procs = [subprocess.Popen([sys.executable, "-u", str(scripts / "inference.py"), "--pairs", str(pairs),
+                                   "--model", str(model), "--out", str(out), "--set", set_name,
+                                   "--shard", f"{k}/{n_gpu}", "--gpu", str(k)]) for k in range(n_gpu)]
+        codes = [p.wait() for p in procs]
+        if not any(codes):
+            break
+        print(f"scoring {set_name}: exit codes {codes}, relaunch {a + 1}/{attempts - 1}", flush=True)
+    else:
+        raise SystemExit(f"scoring {set_name} failed after {attempts} attempts")
     sh(scripts / "inference.py", "--pairs", pairs, "--out", out, "--set", set_name, "--merge")
     shutil.rmtree(out / "parts" / set_name, ignore_errors=True)
 
@@ -93,6 +99,17 @@ def main():
         for s in ("MATCH_VALID", "MATCH_TRAIN", "TEST"):
             score_parallel(scripts, pairs, OUT / "model", OUT, s, n_gpu)
             print(f"elapsed {(time.time() - t0) / 3600:.2f} h", flush=True)
+
+    elif JOB == "score_test":
+        # resume TEST from the k2 run: its model + the chunks it finished before it was OOM-killed, uploaded flat as
+        # the private dataset ber-ce-rec-base-k2 (an errored kernel's output cannot be attached as a kernel source)
+        prev = find("model.safetensors")
+        done = sorted(prev.glob("s*of*_c*.parquet"))
+        (OUT / "parts" / "TEST").mkdir(parents=True, exist_ok=True)
+        for f in done:
+            shutil.copy2(f, OUT / "parts" / "TEST" / f.name)
+        print(f"resuming TEST with {len(done)} finished chunks from {prev}", flush=True)
+        score_parallel(scripts, pairs, prev, OUT, "TEST", n_gpu)
 
     elif JOB == "score_rest":
         prev = find("ce_rec_base/model/config.json")  # K2 kernel output attached as input

@@ -18,7 +18,8 @@ ROOT = Path(__file__).resolve().parents[2]
 STAGE = ROOT / "work" / "ce" / "kaggle"
 PAIR_SETS = ("DEV_REST_180K", "MATCH_TRAIN", "MATCH_VALID", "TEST", "DEV_REST_REST")
 SCRIPTS = ("common.py", "train.py", "inference.py", "probe.py")
-KERNELS = {"k0_probe": "probe", "k2_train_score": "train_score", "k3_score_rest": "score_rest"}
+KERNELS = {"k0_probe": "probe", "k2_train_score": "train_score", "k2b_score_test": "score_test",
+           "k3_score_rest": "score_rest"}
 
 
 def link(src, dst):
@@ -56,8 +57,8 @@ def main():
         (k / "kaggle_run.py").write_text(code)
         meta = {"id": f"{u}/ber-ce-{folder.replace('_', '-')}", "title": f"ber-ce-{folder.replace('_', '-')}",
                 "code_file": "kaggle_run.py", "language": "python", "kernel_type": "script", "is_private": True,
-                "enable_gpu": True, "enable_internet": job != "score_rest", "machine_shape": "NvidiaTeslaT4",
-                "dataset_sources": [f"{u}/ber-ce-pairs"],
+                "enable_gpu": True, "enable_internet": job in ("probe", "train_score"), "machine_shape": "NvidiaTeslaT4",
+                "dataset_sources": [f"{u}/ber-ce-pairs"] + ([f"{u}/ber-ce-rec-base-k2"] if job == "score_test" else []),
                 "kernel_sources": [f"{u}/ber-ce-k2-train-score"] if job == "score_rest" else [],
                 "competition_sources": []}
         write(k / "kernel-metadata.json", meta)

@@ -55,6 +55,53 @@ Negative, flat, and failed runs are logged too — they are the part people forg
 
 ## Log
 
+### 2026-09-27 · S6-file · full_ce: live features + cross-encoder p_ce group, MATCH_ALL minus DEV_REST_180K · INFO (upload candidate)
+- Metrics: `match_train_full_ce.json` · Chain: `plan/checks/run_submission_ce.sh` (log `logs/run_submission_ce.log`) ·
+  Wall: HF a100-large scoring MATCH_TRAIN + DEV_REST_REST 34 min (~$1.42; AUC MATCH_TRAIN 0.99838), train 564 s,
+  exp-predict 297 s.
+- Change: 68 live features + `p_ce_rec`, `p_ce_rec_rank`, `p_ce_rec_gap` (exp group `ce:ce_rec`). DEV_REST_180K rows
+  dropped (cross-encoder training S1: p_ce in-sample there); same seeded fit / early-stop / calibration split as
+  full_single, so the calibration slice is out-of-sample for both models.
+- Result: best_iteration 2334/12000 (converged). Calibration slice 147,462 S1: full_ce 0.98537 vs full_single 0.98162,
+  paired Δ +0.00375 [0.00348, 0.00401], 5,300 S1 changed. Decision: threshold 0.69 + one-owner.
+- Test: 5,744,247 pairs (S2 5,789,591); 103,719 empty S1. File: `submission/output_v6/matching_results.tsv`
+  (sha1 c33d044e…); official validator --check-ids PASS.
+- Caveat: internal→LB transfer has failed before (S3). p_ce is a per-pair score, not a cross-list statistic like
+  comp, so the S3 failure mode (train-vs-test list structure) should not apply — untested until the LB number.
+- Next: upload; log the LB score as S6-LB.
+
+### 2026-09-27 · CE-FEAT-smoke · p_ce group in the final trainer, 50-round smoke (MATCH_TRAIN + MATCH_VALID only) · INFO
+- Metrics: `match_train_smoke_ce.json` · Script: `EXCLUDE_SETS=DEV_REST_180K,DEV_REST_REST NUM_BOOST_ROUND=50
+  train_final_comp.py smoke_ce ce:ce_rec` · Wall: 25 s train, 48 s exp-predict on TEST · Model deleted after the check.
+- Purpose: exercise the new EXCLUDE_SETS / `ce:` group path end to end before the full run (not a candidate).
+- Result: calibration slice 19,985 S1 (same seeded split as full_single, so out-of-sample for both):
+  smoke 0.98383 vs full_single 0.98256, Δ +0.00127 [0.00045, 0.00213]; truncated by design (50/50 rounds).
+  p_ce joins 100% of feature rows; standalone AUC MATCH_VALID p_ce 0.99841 vs p_rerank 0.98605.
+- Next: full run `full_ce` on MATCH_ALL minus DEV_REST_180K (plan/checks/run_submission_ce.sh).
+
+### 2026-09-27 · S5-file · Cross-encoder only (LoRA bge-reranker-v2-m3, ce_rec), threshold + one-owner · INFO
+- Metrics: `ce_submit_ce_rec.json` · Scripts: `ce/hf_job/score_job.py` (HF Jobs a100-large, 49 min, ~$2.05),
+  `ce/hf_job/collect.py`, `ce/ce_submit.py submit --ce ce_rec --fit-set MATCH_TRAIN_S20000` · Adapter: Friend B's
+  1-epoch LoRA on DEV_REST_180K (branch submission-v3, `cross_encoder_lora/adapter/`).
+- Scoring: bf16 on A100, ~3,700 pairs/s; 10,613,056 TEST pairs, 0 non-finite. Format gate: AUC MATCH_VALID 0.99841,
+  MATCH_TRAIN_S20000 0.99835 (friend's held-out eval 0.9986). Local M3 MPS fp32 measured 76 pairs/s (not viable).
+- Decision (fitted on 20,000 train S1, never on test): p_ce >= 0.79 + one-owner; fit F0.5 0.97650.
+  MATCH_VALID (scoring only) F0.5 0.97552 — below M005 on MATCH_VALID (0.98162), above M000 (0.97449).
+- Test: 5,637,038 pairs; ~3.2 predicted per S1 and ~6% empty in every country (France, India, US).
+  File: `submission/output_v5/matching_results.tsv` (sha1 663f29bf…); official validator --check-ids PASS.
+- Expectation: below S2 (0.966797) on the LB; uploaded as a standalone read of the cross-encoder.
+- Next: p_ce as a LightGBM feature (MATCH_ALL minus DEV_REST_180K, where p_ce would be in-sample).
+
+### 2026-09-27 · S4-file · comp + num on MATCH_ALL, hybrid file (diagnostic upload candidate) · INFO
+- Metrics: `match_train_full_comp_num.json`, `final_hybrid_full_comp_num.json` · Scripts: `train_final_comp.py full_comp_num comp num`,
+  `final_hybrid.py full_comp_num` · Wall: 33.5 min train + ~50 min files
+- Result: best_iteration 5636/12000 (converged). Calibration slice: full_comp_num 0.98448 vs full_single 0.98161
+  (+0.00287 [0.00263, 0.00310]); hybrid (threshold 0.64) 0.98324, +0.00163 [0.00145, 0.00179]. Test: hybrid
+  5,817,998 pairs (S2 5,789,591; S3 5,827,052); official validator --check-ids PASS.
+  File: `submission/output_v4/matching_results.tsv` (copy of work/outputs/full_comp_num_hybrid/).
+- Caveat: S3 (same method without num) scored below S2 on the LB; num failed US→India LOCO (−0.00450). Upload
+  only as an A/B diagnostic against S3, not as an expected improvement.
+
 ### 2026-09-26 · S3-LB · Submission 3 leaderboard: contention hybrid did not transfer · INFO
 - Log: `reports/test_usage_log.md` (upload 23:05) · Model metrics: `final_hybrid.json`, `match_train_full_comp.json`
 - Result: public LB shown as 0.966 (rounded, exact pending) vs S2 0.966797 — between −0.0003 and −0.0013, against

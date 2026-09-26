@@ -9,6 +9,7 @@ killed by the 12 h session limit resumes where it stopped. Two processes (--shar
 (s1_idx:int32, pool_idx:uint32, p_ce:float32) and checks the row count and order against the pair file.
 """
 import argparse
+import gc
 import os
 import time
 from pathlib import Path
@@ -22,6 +23,26 @@ CHUNK = 1_000_000
 
 def shard_range(n_rows, k, n):
     return n_rows * k // n, n_rows * (k + 1) // n
+
+
+def read_rows(pf, a, b, columns):
+    """Rows [a, b) of a parquet file, reading only the row groups that overlap them."""
+    groups, start, first = [], 0, None
+    for g in range(pf.metadata.num_row_groups):
+        n = pf.metadata.row_group(g).num_rows
+        if start + n > a and start < b:
+            groups.append(g)
+            first = start if first is None else first
+        start += n
+    return pf.read_row_groups(groups, columns=columns).slice(a - first, b - a)
+
+
+def rss_gb():
+    try:
+        with open("/proc/self/status") as f:
+            return next(int(l.split()[1]) for l in f if l.startswith("VmRSS")) / 2**20
+    except OSError:
+        return float("nan")
 
 
 def run_score(args):
@@ -49,25 +70,39 @@ def run_score(args):
         print(f"merged LoRA adapter {args.model} into {base}", flush=True)
     else:
         model = AutoModelForSequenceClassification.from_pretrained(args.model, num_labels=1)
-    model = (model.half() if dev.type == "cuda" else model.float()).to(dev)
-    table = pq.read_table(src, columns=["s1_idx", "pool_idx", "text_a", "text_b"]).slice(lo, hi - lo)
+    # bf16 on CUDA GPUs with native bf16 (compute capability >= 8: A10G/L4/L40S; fp16 overflowed to NaN in one
+    # model's first training run), fp16 on T4 (is_bf16_supported() is True there too, via slow emulation), fp32 off CUDA
+    bf16 = dev.type == "cuda" and torch.cuda.get_device_capability()[0] >= 8
+    model = (model.to(torch.bfloat16) if bf16 else model.half() if dev.type == "cuda" else model.float()).to(dev)
+    print(f"device {dev}, dtype {next(model.parameters()).dtype}", flush=True)
+    # Memory: read only this chunk's rows (not the whole set), keep token ids as compact int32 arrays, free per
+    # chunk. The first TEST run held the full table + Python int lists and was OOM-killed after 3M rows/process.
+    pf = pq.ParquetFile(src)
     t_all, n_done = time.time(), 0
-    for j, c0 in enumerate(range(0, table.num_rows, CHUNK)):
+    for j, c0 in enumerate(range(lo, hi, CHUNK)):
         path = parts / f"s{k}of{n}_c{j:03d}.parquet"
         if path.exists():
             continue
-        t = table.slice(c0, CHUNK)
+        t = read_rows(pf, c0, min(c0 + CHUNK, hi), ["s1_idx", "pool_idx", "text_a", "text_b"])
         t0 = time.time()
-        ids = tok(t.column("text_a").to_pylist(), t.column("text_b").to_pylist(), truncation=True,
-                  max_length=args.max_length)["input_ids"]
-        p = common.score_ids(model, ids, tok.pad_token_id, dev, tokens_per_batch=args.tokens_per_batch)
+        a, b = t.column("text_a").to_pylist(), t.column("text_b").to_pylist()
+        ids = []
+        for s in range(0, len(a), 100_000):
+            enc = tok(a[s:s + 100_000], b[s:s + 100_000], truncation=True, max_length=args.max_length)["input_ids"]
+            ids += [np.asarray(x, dtype=np.int32) for x in enc]
+            del enc
+        del a, b
+        p = common.score_ids(model, ids, tok.pad_token_id, dev, tokens_per_batch=args.tokens_per_batch,
+                             fp16=not bf16)
         tmp = path.with_name(path.name + ".tmp")
         pq.write_table(pa.table({"s1_idx": t.column("s1_idx"), "pool_idx": t.column("pool_idx"),
                                  "p_ce": pa.array(p)}), tmp)
         tmp.replace(path)
         n_done += t.num_rows
         print(f"{args.set} shard {k}/{n} chunk {j}: {t.num_rows:,} rows, "
-              f"{t.num_rows / (time.time() - t0):.0f} pairs/s (incl. tokenization)", flush=True)
+              f"{t.num_rows / (time.time() - t0):.0f} pairs/s (incl. tokenization), rss {rss_gb():.1f} GB", flush=True)
+        del t, ids, p
+        gc.collect()
     print(f"{args.set} shard {k}/{n} done: {n_done:,} new rows in {time.time() - t_all:.0f}s", flush=True)
 
 

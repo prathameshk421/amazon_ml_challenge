@@ -29,6 +29,8 @@ is the fix — a measured table, and a mechanical check to run after every train
 
 | train_final_single (1,655,458 S1, one model) | 8,979,983 | 7,633,743 | 12000 | **8208** (converged) | No |
 | train_final_comp (1,655,458 S1, one model, 75 features incl. comp) | 8,979,983 | 7,633,743 | 12000 | 6524 (converged) | No (`match_train_full_comp.json`) |
+| train_final_comp full_comp_num (1,655,458 S1, one model, 83 features incl. comp + num) | 8,979,983 | 7,633,743 | 12000 | 5636 (converged) | No (`match_train_full_comp_num.json`) |
+| train_final_comp full_ce (MATCH_ALL minus DEV_REST_180K = 1,475,458 S1, one model, 71 features incl. p_ce group) | 8,003,081 | 6,803,405 | 12000 | 2334 (converged) | No (`match_train_full_ce.json`) |
 
 | exp R0 main (180,000 S1) | 975,699 | ~702,500 | 3000 | 1651, 1819, 2011, 1908, 1574 | No (`exp_R0.json`) |
 | exp M005 main (180,000 S1) | 975,699 | ~702,500 | 3000 | 1758, 1672, 1538, 1465, 1200 | No (`exp_M005.json`) |

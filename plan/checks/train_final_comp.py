@@ -20,6 +20,7 @@ work/match/runs/full_single/models/ and then copies it into work/match/models/ (
 Run from the repository root:
   PYTHONPATH=submission/code/business_entity_resolution/src:plan/checks .venv/bin/python plan/checks/train_final_single.py
 """
+import os
 import sys
 import time
 
@@ -31,11 +32,15 @@ from ber import exp, io_utils, match
 from dev_rest_full import pick_remaining_slice
 
 # usage: train_final_comp.py [RUN] [GROUP ...]   (default: full_comp comp)
+# EXCLUDE_SETS=DEV_REST_180K drops that set's rows (e.g. the cross-encoder's training S1, where p_ce is in-sample);
+# its S1 still enter the seeded permutation, so the fit / early-stop / calibration split of every other S1 is
+# unchanged and the calibration slice stays out-of-sample for full_single too.
 RUN = sys.argv[1] if len(sys.argv) > 1 else "full_comp"
 GROUPS = sys.argv[2:] if len(sys.argv) > 2 else ["comp"]
 SEED = 20260926
 ES_FRAC, CAL_FRAC = 0.05, 0.10
-NUM_BOOST_ROUND = 12000
+NUM_BOOST_ROUND = int(os.environ.get("NUM_BOOST_ROUND", "12000"))  # override only for smoke runs
+EXCLUDE = [s for s in os.environ.get("EXCLUDE_SETS", "").split(",") if s]
 
 
 def main():
@@ -44,8 +49,8 @@ def main():
     lg = io_utils.get_logger("train_final_single")
     fp = match.bucketing_fingerprint(cfg)
     base = match.used_features(mcfg)
-    names = list(match.FEATURES) + [c for g in GROUPS for c in exp.GROUPS[g][0]]
-    feats = base + [c for g in GROUPS for c in exp.GROUPS[g][0]]
+    names = list(match.FEATURES) + [c for g in GROUPS for c in exp.group_spec(g)[0]]
+    feats = base + [c for g in GROUPS for c in exp.group_spec(g)[0]]
     cols = [names.index(f) for f in feats]
     base_cols = [feats.index(f) for f in base]
 
@@ -54,11 +59,15 @@ def main():
             ("DEV_REST_180K", s1_180k), ("DEV_REST_REST", s1_rest)]
     Xs, s1s, pools, qs = [], [], [], []
     for name, q in sets:
+        qs.append(q)
+        if name in EXCLUDE:
+            print(f">>> {name}: excluded ({q.size} S1 kept only in the split permutation)", flush=True)
+            continue
         X, s1, pool, meta = match.load_features(name, fp)
         if meta["features"] != match.FEATURES or meta.get("limited"):
             raise RuntimeError(f"{name}: features stale or --limit build")
         G = np.hstack([exp.load_group(name, g, X, s1, pool) for g in GROUPS])
-        Xs.append(np.hstack([X, G])[:, cols]); s1s.append(s1); pools.append(pool); qs.append(q)
+        Xs.append(np.hstack([X, G])[:, cols]); s1s.append(s1); pools.append(pool)
         print(f">>> {name}: {s1.size} rows with groups ({time.time()-t0:.0f}s)", flush=True)
     X, s1, pool = np.concatenate(Xs), np.concatenate(s1s), np.concatenate(pools)
     queries = np.sort(np.concatenate(qs)).astype(np.int32)
@@ -70,6 +79,10 @@ def main():
     perm = rng.permutation(queries)
     n_cal, n_es = int(CAL_FRAC * queries.size), int(ES_FRAC * queries.size)
     q_cal, q_es = np.sort(perm[:n_cal]), np.sort(perm[n_cal:n_cal + n_es])
+    if EXCLUDE:
+        present = np.unique(s1)
+        q_cal, q_es = q_cal[np.isin(q_cal, present, assume_unique=True)], q_es[np.isin(q_es, present, assume_unique=True)]
+        queries = queries[np.isin(queries, present, assume_unique=True)]
     in_cal, in_es = np.isin(s1, q_cal), np.isin(s1, q_es)
     fit = ~(in_cal | in_es)
     print(f">>> split: fit {fit.sum()} rows, early-stop {in_es.sum()} rows ({q_es.size} S1), "
@@ -131,14 +144,14 @@ def main():
     booster.save_model(str(rd / "model_fold0.txt"), num_iteration=best)
     doc = {"features": match.FEATURES, "extra_groups": GROUPS, "feature_names": names, "features_used": feats,
            "n_folds": 1, "n_seeds": 1, "bucketing_fingerprint": fp,
-           "run": RUN, "train_set": "MATCH_ALL", "train_limited": False, "calibration": calib, "decision": decision,
+           "run": RUN, "train_set": "MATCH_ALL" + (f" minus {EXCLUDE}" if EXCLUDE else ""), "train_limited": False, "calibration": calib, "decision": decision,
            "floor_threshold": floor_t, "oof_f05": f05, "oof_floor_f05": floor[floor_t],
            "holdout_note": "oof_f05 = F0.5 on a held-out 10% of MATCH_ALL S1 (calibration slice), not 5-fold OOF",
            "best_iteration": best, "num_boost_round": NUM_BOOST_ROUND, "truncated": bool(truncated),
            "match_config": mcfg, "created_at": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
     io_utils.atomic_write_json(rd / "matcher.json", doc)
     io_utils.write_metrics(f"match_train_{RUN}", {
-        "run": RUN, "n_queries": int(queries.size), "n_rows": int(y.size), "n_fit_rows": int(fit.sum()),
+        "run": RUN, "groups": GROUPS, "excluded_sets": EXCLUDE, "n_queries": int(queries.size), "n_rows": int(y.size), "n_fit_rows": int(fit.sum()),
         "n_es_s1": int(q_es.size), "n_cal_s1": int(q_cal.size), "best_iteration": best,
         "num_boost_round": NUM_BOOST_ROUND, "truncated": bool(truncated), "holdout_f05": f05,
         "decision": decision, "rule_comparisons": {"expected_f_vs_threshold": ef, "one_owner": oo},

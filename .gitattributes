@@ -6,3 +6,5 @@ work/match/models/*.txt filter=lfs diff=lfs merge=lfs -text
 work/match_k5_submission1/models/*.txt filter=lfs diff=lfs merge=lfs -text
 work/rerank/*.txt filter=lfs diff=lfs merge=lfs -text
 submission/output/*.tsv filter=lfs diff=lfs merge=lfs -text
+work/match/runs/full_ce/models/*.txt filter=lfs diff=lfs merge=lfs -text
+submission/output_v6/*.tsv filter=lfs diff=lfs merge=lfs -text
