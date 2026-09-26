@@ -51,6 +51,17 @@ Negative, flat, and failed runs are logged too — they are the part people forg
 
 ## Log
 
+### 2026-09-26 · CE-SMOKE1 · cross-encoder smoke (Friend B track, details in work/ce/) · INFO
+- Metrics: work/ce/ce_rec_smoke_bf16/run.json (not artifacts/metrics/ — ce track lives in work/ce/).
+- Hypothesis: LoRA r=16 on bge-reranker-v2-m3 attention + full head, bf16, batch 16×accum 4,
+  trained on DEV_REST_180K pairs, learns pair match (eval AUC on held-out 1k S1 groups).
+- Change vs first attempt: fp16 → bf16 (fp16 run went NaN by step 50, eval AUC 0.5215 — FAILED,
+  log work/ce/ce_rec_smoke_train.log) + grad clip 1.0 + fail-fast NaN abort.
+- Result: 1536 steps / 392 s; train loss 0.40 → 0.12; EVAL loss 0.1192, AUC 0.9906.
+  Thermals (threads=4, workers=0): CPU 52–65°C, GPU 60–82°C steady, no guard pause.
+- Learned: bf16 is required for this head on Ada; thermal headroom is ample for the full epoch.
+- Next: full 1-epoch run on 976,897 DEV_REST_180K pairs (~4 h projected).
+
 ### 2026-09-26 · N02 · Experiment routine and this log · INFO
 - Metrics: none (planning).
 - `plan/EXPERIMENT_ROUTINE.md` written: stage-3 experiments on frozen MATCH_TRAIN candidates, ~40 min
