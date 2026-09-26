@@ -43,7 +43,7 @@ Negative, flat, and failed runs are logged too — they are the part people forg
 | 3 matcher | MATCH_VALID 20K | entity F0.5 | 0.98162 | M005 | `match_valid_confirm_M005.json` |
 | 3 matcher | MATCH_TRAIN 180K OOF | entity F0.5 | 0.98211 (comp + num) | M016 | `exp_M016.json` |
 | 3 matcher | MATCH_ALL held-out 165K | entity F0.5 | 0.98360 (full_comp; full_single 0.98161 same S1) | M005-full | `match_train_full_comp.json` |
-| submission | test (public LB) | entity F0.5 | 0.966797 (S2, full_single); S1 0.966109 | S2 | `match_train_full_single.json`, `reports/test_usage_log.md` |
+| submission | test (public LB) | entity F0.5 | 0.966797 (S2, full_single); S1 0.966109; S3 0.966 (rounded, worse) | S2 | `match_train_full_single.json`, `reports/test_usage_log.md` |
 
 ## Open questions
 
@@ -54,6 +54,53 @@ Negative, flat, and failed runs are logged too — they are the part people forg
 ---
 
 ## Log
+
+### 2026-09-26 · S3-LB · Submission 3 leaderboard: contention hybrid did not transfer · INFO
+- Log: `reports/test_usage_log.md` (upload 23:05) · Model metrics: `final_hybrid.json`, `match_train_full_comp.json`
+- Result: public LB shown as 0.966 (rounded, exact pending) vs S2 0.966797 — between −0.0003 and −0.0013, against
+  an internal held-out gain of +0.00143 (hybrid) on the MATCH_ALL calibration slice.
+- Learned: third internal→LB failure (S2 kept ~10%, S3 negative). Candidates: (1) contention distribution
+  shift on contested rows (N07: test US/IN less contested, France 1.17 vs 0.46 mean log lists-per-record);
+  (2) hybrid threshold 0.59 vs live 0.69 added 37,461 pairs on test (unmeasured whether FP);
+  (3) internal validation does not reproduce the test pool's structure (4.68 vs 5.75 records per S1), so any
+  cross-list feature is tuned to train's structure. Internal gains from cross-list features are not evidence
+  for the leaderboard until a test-like validation set (RCA D3) exists.
+- Next: do not upload the comp+num file; build the D3 densified validation set; re-judge M005/M010/M017 on it.
+
+### 2026-09-26 · N08 · LOCO by feature group (item 14, France proxy) · INFO
+- Metrics: `loco_groups.json` · Script: `plan/checks/loco_groups.py` · Wall: ~50 min (paused 8 min for the S3 deadline)
+- Change: one LightGBM per direction on one country's MATCH_TRAIN S1 (90% fit / 10% early stop + isotonic),
+  x1 threshold 0.67 + one-owner, scored on the other country; paired vs the 68-feature base.
+- Result (US→India / India→US): base 0.95268 / 0.97216. +comp +0.00497 / +0.00506; +num −0.00450 / +0.00151;
+  +sib +0.00131 / −0.00144; +dinv +0.00045 / +0.00021. Dropping: name_str +0.00039 / −0.00181, idf −0.00720 /
+  −0.00274, addr_str −0.01234 / −0.00862, list −0.00062 / −0.00158, counts −0.00077 / −0.00184, context
+  (src, country3, pool_indic) +0.00081 / −0.00005. All CIs in the file.
+- Learned: contention transfers across countries; the address-number group is country-specific (US-trained
+  number rules hurt India). No base family is dead weight except possibly `context` for US→India.
+- Next: prefer comp-only for France-heavy uncertainty; if num is kept, consider it only with India+US training
+  (already the case) and watch the S3 vs S4 leaderboard difference.
+
+### 2026-09-26 · M017 · Specialists (converged, cap 10000) on top of comp + num · PARKED (needs canary + full-scale plan)
+- Parent: M016 · Metrics: `exp_M017.json` · Wall: ~70 min (concurrent jobs)
+- Result: OOF 0.98330 vs 0.98211, Δ +0.00119 [0.00098, 0.00141]; band +0.00424; singleton −0.00010 [−0.00196, 0.00186].
+  Name specialist converged at 4056-4732/10000; no fold truncated.
+- Learned: the specialist/disagreement stack is additive with comp + num. Stacked features need the label-shuffle
+  canary (EXPERIMENT_ROUTINE §6) and 5-fold specialist OOF on MATCH_ALL (several hours) before a submission.
+- Next: canary on MATCH_TRAIN, then plan the MATCH_ALL stack.
+
+### 2026-09-26 · M015 · Fellegi-Sunter m/u log-likelihood feature (item 12) · DROPPED
+- Parent: x1_strsim · Metrics: `exp_M015.json`
+- Result: OOF 0.97813, Δ +0.00007 [−0.00008, 0.00022]; band +0.00025 (CI crosses 0).
+- Learned: trees already read the same binned agreement pattern from the raw columns.
+
+### 2026-09-26 · S3 · Submission 3 file (comp-only hybrid) · INFO
+- Metrics: `final_hybrid.json`, `match_train_full_comp.json` · File: `submission/output_v3/matching_results.tsv`
+  (sha1 b84e9e5e…, copy of work/outputs/full_hybrid/)
+- Rule: rows whose pool record is in >= 2 test S1 lists take full_comp's p, others full_single's; threshold 0.59,
+  one-owner off (chosen on the MATCH_ALL calibration slice). Slice: hybrid 0.98305, full_comp 0.98360, full_single
+  0.98161; hybrid − single +0.00143 [0.00125, 0.00160].
+- Test: 5,827,052 pairs (submission 2: 5,789,591); contested row share 32.1%; official validate_submission.py
+  --check-ids PASS (also PASS for the pure full_comp file). Leaderboard score: pending upload.
 
 ### 2026-09-26 · N08 · FP/FN report with raw text, full_single + full_comp, MATCH_ALL calibration slice · INFO
 - Parent: none · Metrics: `error_report.json`, `error_report_tags.json` · Wall: 27 min (feature load)
