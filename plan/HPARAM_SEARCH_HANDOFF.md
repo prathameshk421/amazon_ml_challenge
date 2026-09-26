@@ -19,6 +19,14 @@ cd amazon_ml_challenge
 git checkout submission-v2
 ```
 
+Read `AGENTS.md` and `plan/ROUND_CAP_EVIDENCE.md` before this run finishes. Short version: a fixed
+training-round cap that looked safe at a smaller data size has already been measured, twice, to be too
+low at a bigger one — every fold's `best_iteration` needs checking against its cap, and if it's at or
+near the cap, that fold didn't actually converge, it got cut off. `hparam_search.py` already accounts for
+this (its cap scales with `learning_rate` and retries a truncated fold once at 2x), but the console
+output should still be read carefully rather than trusted blindly — if the final report says any trial
+was "TRUNCATED", say so when reporting results back rather than treating that trial's number as final.
+
 ## 2. Set up Python
 
 Match versions if possible (not strictly required, but this pins what was tested):
