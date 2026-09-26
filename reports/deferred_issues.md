@@ -18,3 +18,20 @@ matter, suggested fix (not applied).
   chunk instead of once at the end, so a crash keeps partial progress (candidates/ already supports
   resumable parts via `_candidates_ready`, this would just mean writing them incrementally instead of
   all at once).
+
+## Stage-2 re-ranker: zero-padded numbers read as postal codes (2026-09-26)
+- Where: `src/ber/rerank.py::_postal_tokens` / `compute_features` (`postal` feature).
+- What: pool addresses zero-pad house/door numbers (`0412 brunswick dr`, `door no 0381`). A 4-digit
+  zero-padded house number passes the 4-6 digit postal test, and `0412` never equals the S1's `412`.
+  The stage-3 matcher had the same defect in its number features; there it is fixed (`match._canon_num`;
+  2.7% of MATCH_VALID true pairs with numbers on both sides shared a number only after stripping zeros).
+- Why not fixed here: changing a stage-2 feature means rerank-build/train/cut and regenerating every
+  candidate set (TEST alone 8,463 s). Bundle it with the next stage-2 retrain.
+- Suggested fix: canonicalize digit tokens (`t.lstrip("0") or "0"`) before `_postal_tokens` and compare.
+
+## Stage-2 re-ranker stopped at the round cap (2026-09-26)
+- `rerank_train.json`: best_iteration 400 = num_boost_round 400; early stopping never fired.
+- Effect unmeasured. Measure first: retrain with num_boost_round 3000 (early stopping 50) into a separate
+  model file and compare RR_CAL logloss and the F0.5 ceiling at the chosen cut. With K_min 20 the ceiling
+  is within 0.0001 of stage 1 (`rerank_cut.json`), so any gain would come through `p_rerank` as a
+  matcher feature, not through recall.

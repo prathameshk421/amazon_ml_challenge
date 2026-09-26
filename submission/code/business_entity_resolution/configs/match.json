@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "train_set": "MATCH_TRAIN",
   "confirm_set": "MATCH_VALID",
   "n_folds": 5,
@@ -28,9 +28,14 @@
     "threshold_start": 0.05,
     "threshold_stop": 0.95,
     "threshold_step": 0.01,
-    "expected_f_min_gain": 0.001,
+    "expected_f_min_gain": 0.0,
     "one_owner_min_gain": 0.0
   },
   "confirm_tolerance": 0.003,
-  "error_export_max_rows": 20000
+  "error_export_max_rows": 20000,
+  "cand_filter": {
+    "K_min": 5,
+    "p_min": 0.05
+  },
+  "drop_features": []
 }

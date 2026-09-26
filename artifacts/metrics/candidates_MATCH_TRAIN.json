@@ -123,7 +123,7 @@
     "holdout_frac": 0.1
    },
    "cut": {
-    "K_min": 5,
+    "K_min": 20,
     "K_max": 60,
     "p_min": 0.05
    },
@@ -230,9 +230,9 @@
     "value": false
    },
    "rerank.cut.K_min": {
-    "experiment": "rerank-cut",
+    "experiment": "k-sweep: wide candidates, matcher filters to K_min in {5,10,15,20} (candidate size is not scored)",
     "metrics": "artifacts/metrics/rerank_cut.json",
-    "value": 5
+    "value": 20
    },
    "rerank.cut.K_max": {
     "experiment": "rerank-cut",
@@ -246,16 +246,16 @@
    }
   }
  },
- "config_hash": "fc7811e23cb9358ab31b04e2b784fe8516779e5d",
+ "config_hash": "3355e99c21f3ab992b3d607cd31ebba8bc284663",
  "norm_version": "2.1",
- "git_commit": "79bad2eeb2d0415f19299bc5d6377e1c36d87a94",
- "created_at": "2026-09-25T21:06:51+05:30",
+ "git_commit": "fd77ee792acf56b54a5694dd9e0e3950a2c9b115",
+ "created_at": "2026-09-26T01:32:59+05:30",
  "set": "MATCH_TRAIN",
  "out_dir": "MATCH_TRAIN",
  "split": "train",
  "limited": false,
  "n_empty": 0,
- "size_mean": 5.42055,
- "wall_s": 938.4,
- "peak_rss_mb": 933.3
+ "size_mean": 20.000183333333332,
+ "wall_s": 744.9,
+ "peak_rss_mb": 1000.1
 }

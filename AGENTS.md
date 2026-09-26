@@ -30,6 +30,7 @@ Details: `data/student_resource/dataset/split.md`.
 - Prefer one heavy job at a time. Chunk large tables; do not materialize a full S1×pool dense matrix. Use parquet for large intermediates.
 - Install into the project venv, not `--user` / system Python.
 - Update `PROGRESS.md` when you finish a real phase (ingest, index, a named experiment), not after every tiny edit.
+- Every experiment run (including dropped, flat, and failed ones), adoption decision, val-S1 score, and leaderboard upload gets an entry in `RESEARCH_LOG.md`, newest first, using its template. Every number cites its `artifacts/metrics/*.json`. Read its **Current best** and **Open questions** before starting new work. Experiment procedure: `plan/EXPERIMENT_ROUTINE.md`; validation rules: `plan/VALIDATION_PLAN.md`.
 - You may print samples, diffs, and stack traces. Do not dump entire multi-million-row TSVs into chat.
 - `[goal:complete]` / `[goal:blocked]` / `logs/STOP` / `pmset` / “never ask the user” do **not** apply anymore.
 

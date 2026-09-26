@@ -79,6 +79,24 @@ class TestExpectedF(unittest.TestCase):
         self.assertFalse(keep[0] or keep[3])
 
 
+class TestPairedGate(unittest.TestCase):
+    def test_no_change_not_adopted(self):
+        f = np.ones(1000)
+        cmp = match.paired_delta(f, f)
+        self.assertEqual(cmp["delta"], 0.0)
+        self.assertFalse(match.adopt(cmp, 0.0))
+
+    def test_consistent_gain_adopted_noisy_gain_not(self):
+        a = np.zeros(10_000)
+        b = a.copy()
+        b[:200] = 1.0  # 200 entities better, none worse
+        self.assertTrue(match.adopt(match.paired_delta(b, a), 0.0))
+        self.assertFalse(match.adopt(match.paired_delta(b, a), 0.05))  # below min_gain
+        c = a.copy()
+        c[:3], c[3:5] = 1.0, -1.0  # +1 entity net out of 10,000: CI spans zero
+        self.assertFalse(match.adopt(match.paired_delta(c, a), 0.0))
+
+
 class TestOneOwner(unittest.TestCase):
     def test_keeps_highest_owner_only(self):
         pool = np.array([7, 7, 8, 7], dtype=np.uint32)
@@ -92,9 +110,11 @@ class TestFeatures(unittest.TestCase):
                      "indic": False}, **kw)
 
     def feats(self, q, p):
+        # PAIR_FEATURES = [p_rerank, rank, ...pair_features() output..., n_tfidf_cos, a_tfidf_cos]; the
+        # tfidf cosines are filled in _feature_chunk() from a whole chunk, not by pair_features() itself.
         vals = pair_features(q, p, {}, {}, G)
-        self.assertEqual(len(vals), len(PAIR_FEATURES) - 2)
-        return dict(zip(PAIR_FEATURES[2:], vals))
+        self.assertEqual(len(vals), len(PAIR_FEATURES) - 4)
+        return dict(zip(PAIR_FEATURES[2:-2], vals))
 
     def test_identical(self):
         f = self.feats(self.rec("happy nails llc", "12 main st 10001"),
@@ -127,6 +147,60 @@ class TestFeatures(unittest.TestCase):
         f = self.feats(self.rec("a b", "", "France"), self.rec("a b", "", ""))
         self.assertEqual(f["country3"], 2.0)
 
+    def test_digits_state_four_way(self):
+        f = self.feats(self.rec("x", "412 main st"), self.rec("x", "412 main st"))
+        self.assertEqual(f["a_digits_state"], 3.0)
+        f = self.feats(self.rec("x", "412 main st"), self.rec("x", "412 480 main st"))
+        self.assertEqual(f["a_digits_state"], 2.0)
+        f = self.feats(self.rec("x", "412 main st"), self.rec("x", "480 main st"))
+        self.assertEqual(f["a_digits_state"], 1.0)
+        f = self.feats(self.rec("x", "412 main st"), self.rec("x", "main st"))
+        self.assertEqual(f["a_digits_state"], 0.0)
+        f = self.feats(self.rec("x", "main st"), self.rec("x", "main st"))
+        self.assertTrue(np.isnan(f["a_digits_state"]))
+        # leading-zero rescue: raw sets differ, stripped sets equal -> match, not conflict
+        f = self.feats(self.rec("x", "412 brunswick dr"), self.rec("x", "0412 brunswick dr"))
+        self.assertEqual(f["a_digits_state"], 3.0)
+
+    def test_zero_padded_numbers_agree(self):
+        # pool addresses write 0412 / door no 0381; the same number must not count as a conflict
+        f = self.feats(self.rec("uptown pizza", "412 brunswick drive troy"),
+                       self.rec("uptown pizza", "0412 brunswick drive troy"))
+        self.assertEqual(f["a_house"], 1.0)
+        self.assertEqual(f["a_longnum"], 2.0)
+        self.assertEqual(f["a_num_jacc"], 1.0)
+        self.assertEqual(f["a_numstreet"], 1.0)
+        self.assertEqual(f["a_num_minlev"], 0.0)
+
+    def test_address_shape_features(self):
+        f = self.feats(self.rec("x", "19010 meridian place bothell"), self.rec("x", "9010 meridian place bothell"))
+        self.assertEqual(f["a_num_minlev"], 1.0)
+        self.assertEqual(f["a_numstreet"], 0.0)
+        f = self.feats(self.rec("x", "mg road"), self.rec("x", "mgroad"))
+        self.assertEqual(f["a_char3_jacc"], 1.0)
+        f = self.feats(self.rec("x", "main st"), self.rec("x", "oak ave"))
+        for k in ("a_num_minlev", "a_numstreet"):
+            self.assertTrue(np.isnan(f[k]), k)
+
+    def test_shared_maxidf_and_counts(self):
+        idf = {"acme": 5.0, "llc": 0.5, "store": 1.0}
+        vals = pair_features(self.rec("acme store llc", ""), self.rec("acme llc", ""), idf, {}, G)
+        f = dict(zip(PAIR_FEATURES[2:], vals))
+        self.assertEqual(f["n_shared_maxidf"], 5.0)
+        self.assertTrue(np.isnan(f["a_shared_maxidf"]))
+        self.assertTrue(np.isnan(f["q_name_cnt"]))  # not supplied -> NaN, never 0
+        vals = pair_features(self.rec("a", "", name_cnt=1.5), self.rec("a", "", addr_cnt=2.0), {}, {}, G)
+        f = dict(zip(PAIR_FEATURES[2:], vals))
+        self.assertEqual(f["q_name_cnt"], 1.5)
+        self.assertEqual(f["p_addr_cnt"], 2.0)
+
+    def test_count_keys(self):
+        self.assertEqual(match._count_key("name", "happy nails llc", G), match._count_key("name", "nails happy", G))
+        self.assertEqual(match._count_key("addr", "508 raemar drive co", G),
+                         match._count_key("addr", "co 508 raemar drive", G))
+        self.assertNotEqual(match._count_key("addr", "508 raemar drive", G),
+                            match._count_key("addr", "510 raemar drive", G))
+
     def test_list_features(self):
         X = np.full((3, len(FEATURES)), np.nan, dtype=np.float32)
         c = match._COL
@@ -145,8 +219,56 @@ class TestFeatures(unittest.TestCase):
         np.testing.assert_array_equal(X[:, c["l_n_name_close"]], [2, 2, 2])
         np.testing.assert_array_equal(X[:, c["l_n_longnum_shared"]], [2, 2, 2])
         self.assertTrue(np.isnan(X[1, c["l_nidf_gap_max"]]))
+        np.testing.assert_array_equal(X[:, c["l_n_addr_close"]], [0, 0, 0])
         for f in LIST_FEATURES:
             self.assertFalse(np.isnan(X[0, c[f]]), f)
+
+    def test_monge_elkan(self):
+        # identical name -> both directions are self-similarity 1.0
+        f = self.feats(self.rec("happy nails llc", ""), self.rec("happy nails llc", ""))
+        self.assertAlmostEqual(f["n_me_mean"], 1.0, places=6)
+        self.assertAlmostEqual(f["n_me_min"], 1.0, places=6)
+        # disjoint tokens -> low similarity both ways
+        f = self.feats(self.rec("acme corp", ""), self.rec("zzqq wwvv", ""))
+        self.assertLess(f["n_me_mean"], 0.5)
+        self.assertLess(f["n_me_min"], 0.5)
+        # no tokens on one side -> NaN, not 0
+        f = self.feats(self.rec("", ""), self.rec("acme corp", ""))
+        self.assertTrue(np.isnan(f["n_me_mean"]))
+        self.assertTrue(np.isnan(f["n_me_min"]))
+
+    def test_phonetic_jaccard(self):
+        # smith/smyth share both a metaphone and a soundex code
+        f = self.feats(self.rec("smith enterprises", ""), self.rec("smyth enterprises", ""))
+        self.assertEqual(f["n_metaphone_jacc"], 1.0)
+        self.assertEqual(f["n_soundex_jacc"], 1.0)
+        # digit-only "name" has no eligible token -> NaN
+        f = self.feats(self.rec("123 456", ""), self.rec("acme corp", ""))
+        self.assertTrue(np.isnan(f["n_metaphone_jacc"]))
+        self.assertTrue(np.isnan(f["n_soundex_jacc"]))
+        # disjoint words -> jaccard < 1
+        f = self.feats(self.rec("acme corp", ""), self.rec("zzqq wwvv", ""))
+        self.assertLess(f["n_metaphone_jacc"], 1.0)
+
+    def test_tfidf_pair_cosine(self):
+        from sklearn.feature_extraction.text import HashingVectorizer
+        hv = HashingVectorizer(analyzer="char_wb", ngram_range=(2, 4), n_features=2 ** 12,
+                               alternate_sign=False, norm=None)
+        idf = np.ones(2 ** 12, dtype=np.float32)  # uniform weights: isolates the cosine mechanism
+        q_texts = ["acme corp", "zz totally unrelated"]
+        p_texts = ["acme corp", "acme corp", "nothing in common here"]
+        bounds = [(0, 2), (2, 3)]
+        cos = match.tfidf_pair_cosine(hv, idf, q_texts, p_texts, bounds)
+        self.assertAlmostEqual(cos[0], 1.0, places=5)  # identical strings -> cosine 1.0
+        self.assertAlmostEqual(cos[1], 1.0, places=5)
+        self.assertLess(cos[2], 0.3)  # near-disjoint char n-grams -> low cosine
+
+        # address variant: NaN wherever either side's address is empty, not 0.0
+        a_cos = match.tfidf_addr_cosine(hv, idf, ["12 main st", ""], ["12 main st", "5 oak ave", "9 elm rd"],
+                                        [(0, 1), (1, 3)])
+        self.assertAlmostEqual(a_cos[0], 1.0, places=5)
+        self.assertTrue(np.isnan(a_cos[1]))
+        self.assertTrue(np.isnan(a_cos[2]))
 
     def test_calibrate_clips(self):
         np.testing.assert_allclose(calibrate(np.array([-1.0, 0.5, 2.0]), {"x": [0.0, 1.0], "y": [0.1, 0.9]}),

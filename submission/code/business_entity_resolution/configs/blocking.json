@@ -227,7 +227,7 @@
       "value": false
     },
     "rerank.cut.K_min": {
-      "experiment": "rerank-cut",
+      "experiment": "revert: teammate's ADDRESS_EXPERIMENTS.md S4 already measured K_min widening (ceiling +0.002 past K=5, not worth it); K_min stays 5, keep the matcher feature gain instead (k5_feat vs k5_base OOF +0.00211 CI[0.00190,0.00235])",
       "metrics": "artifacts/metrics/rerank_cut.json",
       "value": 5
     },

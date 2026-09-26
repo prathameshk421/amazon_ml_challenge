@@ -29,6 +29,7 @@ COMMANDS = {
     "match-train": ("match", "run_match_train"),
     "match-eval": ("match", "run_match_eval"),
     "match-predict": ("match", "run_match_predict"),
+    "match-compare": ("match", "run_match_compare"),
 }
 
 
@@ -71,6 +72,12 @@ def build_parser():
     me.add_argument("--force", action="store_true", help="re-score HOLDOUT_TEST (unchanged matcher only)")
     for name in ("match-features", "match-train"):
         parsers[name].add_argument("--workers", type=int, help="worker processes / LightGBM threads")
+    parsers["match-train"].add_argument(
+        "--run", help="experiment name: keeps models, OOF and per-entity scores in work/match/runs/RUN/")
+    mc = parsers["match-compare"]
+    mc.add_argument("--a", required=True, help="baseline run")
+    mc.add_argument("--b", required=True, help="challenger run")
+    mc.add_argument("--set", choices=("OOF", "MATCH_VALID"), default="OOF")
     return p
 
 

@@ -22,12 +22,13 @@ import math
 import time
 from pathlib import Path
 
+import jellyfish
 import numpy as np
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
-from rapidfuzz import fuzz
-from rapidfuzz.distance import JaroWinkler
+from rapidfuzz import fuzz, process
+from rapidfuzz.distance import JaroWinkler, Levenshtein
 
 from ber import hashing, io_utils, splits
 from ber.index_store import IndexStore
@@ -51,15 +52,31 @@ PAIR_FEATURES = [
     "a_num_jacc", "a_num_q_only", "a_num_p_only", "a_longnum", "a_house", "a_empty",
     # record meta
     "country3", "src", "pool_indic", "log_chain",
+    # rarest shared token, address shape (substring, char 3-grams, near-equal numbers, number + street)
+    "n_shared_maxidf", "a_shared_maxidf", "a_partial", "a_char3_jacc", "a_num_minlev", "a_numstreet",
+    # log1p pool count of records with the same core name / the same address token set (split pool)
+    "q_name_cnt", "p_name_cnt", "q_addr_cnt", "p_addr_cnt",
+    # Fellegi-Sunter-style 4-state digit agreement code (0 one-side, 1 conflict, 2 overlap, 3 match; NaN
+    # neither side has digits), distinct from a_longnum which only covers >=3-digit tokens
+    "a_digits_state",
+    # X1 string-similarity group (plan/FEATURE_EXPERIMENTS.md): Monge-Elkan (Jaro-Winkler) and phonetic
+    # set Jaccard on name tokens, computed per pair in pair_features(); char n-gram TF-IDF cosine on name
+    # and address text, computed vectorized per chunk in _feature_chunk() and written directly into these
+    # last two columns (not part of pair_features()'s return value).
+    "n_me_mean", "n_me_min", "n_metaphone_jacc", "n_soundex_jacc",
+    "n_tfidf_cos", "a_tfidf_cos",
 ]
+TFIDF_N_FEATURES = 2 ** 20
+_PHONETIC_MIN_LEN = 2
 LIST_FEATURES = [
     "l_n", "l_p_max", "l_p_gap_max", "l_p_ratio_max", "l_p_gap_next", "l_p_sum",
     "l_rank_ntset", "l_rank_atset", "l_ntset_max_other", "l_nidf_gap_max",
-    "l_n_name_close", "l_n_longnum_shared", "l_share_same_src",
+    "l_n_name_close", "l_n_longnum_shared", "l_share_same_src", "l_n_addr_close",
 ]
 FEATURES = PAIR_FEATURES + LIST_FEATURES
 _COL = {f: i for i, f in enumerate(FEATURES)}
 _NAME_CLOSE = 0.9
+_ADDR_CLOSE = 0.9
 _LONGNUM_MIN = 3  # digit tokens of >= 3 digits: house / plot / door numbers, PIN / ZIP when present
 
 
@@ -83,12 +100,25 @@ def _file_sha1(path):
 
 def bucketing_fingerprint(cfg):
     """Identity of the candidate generator whose output the matcher consumes: stage-2 model file, its
-    stage-1 hashes and the cut. Features, models and predictions must all share it."""
+    stage-1 hashes, the cut and the matcher-side candidate filter. Features, models and predictions must
+    all share it."""
     meta = io_utils.read_json(io_utils.work_path("rerank", "model_v1_meta.json"))
     doc = {"rerank_model_sha1": _file_sha1(io_utils.work_path("rerank", "model_v1.txt")),
            "stage1_config_hash": meta["stage1_config_hash"],
            "stage1_model_hash": meta["stage1_model_hash"], "cut": cfg["rerank"]["cut"]}
+    cand_filter = load_match_config().get("cand_filter")
+    if cand_filter:
+        doc["cand_filter"] = cand_filter
     return io_utils.config_hash(doc)
+
+
+def used_features(mcfg):
+    """Features the model is trained on: FEATURES minus match.json `drop_features` (ablations)."""
+    drop = set(mcfg.get("drop_features", []))
+    unknown = drop - set(FEATURES)
+    if unknown:
+        raise ValueError(f"match.json drop_features not in FEATURES: {sorted(unknown)}")
+    return [f for f in FEATURES if f not in drop]
 
 
 def _set_split(set_name):
@@ -108,7 +138,11 @@ def set_queries(set_name):
 # ---------------------------------------------------------------- candidates
 
 def read_candidates(set_name, s1_idx):
-    """Candidate rows of the given queries, sorted by (s1_idx, rank): dict of numpy arrays."""
+    """Candidate rows of the given queries, sorted by (s1_idx, rank): dict of numpy arrays.
+
+    match.json `cand_filter` {"K_min", "p_min"} keeps rows with rank <= K_min or p_rerank >= p_min, i.e. a
+    narrower stage-2 cut than the one the candidates were generated with (same K_max). It lets one wide
+    candidate run serve every narrower cut; the final pipeline sets the cut in blocking.json instead."""
     d = io_utils.paths()["work_root"] / "candidates" / set_name
     parts = sorted(d.glob("part-*.parquet"))
     if not parts:
@@ -118,10 +152,14 @@ def read_candidates(set_name, s1_idx):
         raise RuntimeError(f"{d}: unfinished parts {unfinished} (candidates run still going?)")
     t = pa.concat_tables([pq.read_table(p) for p in parts])
     s1 = t.column("s1_idx").to_numpy().astype(np.int32)
+    rank = t.column("rank").to_numpy().astype(np.int32)
+    p_rr = t.column("p_rerank").to_numpy().astype(np.float32)
     keep = np.isin(s1, s1_idx)
+    cand_filter = load_match_config().get("cand_filter")
+    if cand_filter:
+        keep &= (rank <= cand_filter["K_min"]) | (p_rr >= cand_filter["p_min"])
     out = {"s1_idx": s1[keep], "pool_idx": t.column("pool_idx").to_numpy()[keep].astype(np.uint32),
-           "rank": t.column("rank").to_numpy()[keep].astype(np.int32),
-           "p_rerank": t.column("p_rerank").to_numpy()[keep].astype(np.float32)}
+           "rank": rank[keep], "p_rerank": p_rr[keep]}
     order = np.lexsort((out["rank"], out["s1_idx"]))
     return {k: v[order] for k, v in out.items()}
 
@@ -199,11 +237,79 @@ def _skeletons(tokens):
     return {k for k in (skeleton(t) for t in tokens if len(t) >= 2) if len(k) >= 2}
 
 
+def _canon_num(t):
+    """Digit token without leading zeros: pool addresses write 0412 / door no 0381 for 412 / 381."""
+    return t.lstrip("0") or "0"
+
+
 def _numbers(addr_toks):
-    """(all digit tokens, digit tokens with >= _LONGNUM_MIN digits, first digit token or None)."""
-    digits = [t for t in addr_toks if t.isdigit()]
+    """(all digit tokens, digit tokens with >= _LONGNUM_MIN digits, first digit token or None), each
+    without leading zeros."""
+    digits = [_canon_num(t) for t in addr_toks if t.isdigit()]
     longnum = {t for t in digits if len(t) >= _LONGNUM_MIN}
     return set(digits), longnum, (digits[0] if digits else None)
+
+
+def _num_street(toks):
+    """(number, following word) pairs of an address: 1612 grandview avenue -> {("1612", "grandview")}."""
+    return {(_canon_num(a), b) for a, b in zip(toks, toks[1:])
+            if a.isdigit() and len(b) >= 2 and b.isalpha()}
+
+
+def _char3(s):
+    s = s.replace(" ", "")
+    return {s[i:i + 3] for i in range(len(s) - 2)}
+
+
+def _digits_state(q_dig, p_dig):
+    """Fellegi-Sunter-style 4-state code on stripped digit token sets: 3 match (equal sets), 2 overlap
+    (both nonempty, share >=1 token, sets differ), 1 conflict (both nonempty, disjoint), 0 one-side
+    (exactly one side has digits); NaN when neither side has any digit token (no information, not 0)."""
+    if not q_dig and not p_dig:
+        return NAN
+    if not q_dig or not p_dig:
+        return 0.0
+    if q_dig == p_dig:
+        return 3.0
+    return 2.0 if q_dig & p_dig else 1.0
+
+
+def _monge_elkan(qt, pt):
+    """F3: Monge-Elkan on name tokens with rapidfuzz JaroWinkler.normalized_similarity as the inner sim:
+    for each token of one side, take its best match on the other side, then average (Monge-Elkan is not
+    symmetric); returns (mean of both directions, min of both directions). NaN if either side has no
+    tokens."""
+    if not qt or not pt:
+        return NAN, NAN
+    m = process.cdist(qt, pt, scorer=JaroWinkler.normalized_similarity)
+    q_to_p = float(m.max(axis=1).mean())
+    p_to_q = float(m.max(axis=0).mean())
+    return (q_to_p + p_to_q) / 2.0, min(q_to_p, p_to_q)
+
+
+def _phonetic_tokens(tokens):
+    """ASCII alphabetic tokens of length >= 2 (jellyfish's metaphone/soundex are undefined on digits and
+    are unreliable on very short or non-ASCII tokens)."""
+    return [t for t in tokens if len(t) >= _PHONETIC_MIN_LEN and t.isascii() and t.isalpha()]
+
+
+def _phonetic_jacc(qt, pt, code_fn):
+    """F4: Jaccard of phonetic-code sets (Metaphone or Soundex, via jellyfish) over eligible name tokens.
+    NaN if either side has no eligible token."""
+    q_elig, p_elig = _phonetic_tokens(qt), _phonetic_tokens(pt)
+    if not q_elig or not p_elig:
+        return NAN
+    qs = {code_fn(t) for t in q_elig}
+    ps = {code_fn(t) for t in p_elig}
+    return len(qs & ps) / len(qs | ps)
+
+
+def _shared_maxidf(q_toks, p_toks, idf):
+    """Largest idf among tokens both sides share (0 if none); NaN when either side has no tokens."""
+    qs, ps = set(q_toks), set(p_toks)
+    if not qs or not ps:
+        return NAN
+    return max((idf.get(t, 0.0) for t in qs & ps), default=0.0)
 
 
 def pair_features(q, p, name_idf, addr_idf, G):
@@ -252,7 +358,26 @@ def pair_features(q, p, name_idf, addr_idf, G):
     qc, pc = q["country"], p["country"]
     meta = [2.0 if not qc or not pc else float(qc == pc), float(p["src"]), float(p["indic"]),
             math.log1p(q["chain"])]
-    return name + addr + meta
+
+    if q_long and p_long:
+        num_minlev = min(Levenshtein.distance(a, b) for a in q_long for b in p_long)
+    else:
+        num_minlev = NAN
+    q_ns, p_ns = _num_street(qat), _num_street(pat)
+    q3, p3 = (_char3(qa), _char3(pa_)) if both_addr else (set(), set())
+    extra = [
+        _shared_maxidf(qt, pt, name_idf), _shared_maxidf(qat, pat, addr_idf),
+        fuzz.partial_ratio(qa, pa_) / 100.0 if both_addr else NAN,
+        len(q3 & p3) / len(q3 | p3) if q3 and p3 else NAN,
+        float(num_minlev),
+        float(bool(q_ns & p_ns)) if q_ns and p_ns else NAN,
+        q.get("name_cnt", NAN), p.get("name_cnt", NAN), q.get("addr_cnt", NAN), p.get("addr_cnt", NAN),
+        _digits_state(q_dig, p_dig),
+    ]
+
+    me_mean, me_min = _monge_elkan(qt, pt)
+    sim = [me_mean, me_min, _phonetic_jacc(qt, pt, jellyfish.metaphone), _phonetic_jacc(qt, pt, jellyfish.soundex)]
+    return name + addr + meta + extra + sim
 
 
 def list_features(X):
@@ -285,6 +410,158 @@ def list_features(X):
     X[:, c["l_n_name_close"]] = float((ntset >= _NAME_CLOSE).sum())
     X[:, c["l_n_longnum_shared"]] = float((X[:, c["a_longnum"]] == 2.0).sum())
     X[:, c["l_share_same_src"]] = (src[None, :] == src[:, None]).mean(1)
+    X[:, c["l_n_addr_close"]] = float((a >= _ADDR_CLOSE).sum())
+
+
+# ---------------------------------------------------------------- pool count tables (unsupervised)
+
+COUNT_KINDS = ("name", "addr")
+
+
+def _count_key(kind, text, G):
+    """Key whose pool frequency is counted: core name tokens (edge tokens G removed, as `_core`) or the
+    address token set; both sorted, so word-order transposition and component reordering share a key."""
+    toks = text.split()
+    if kind == "name":
+        return " ".join(sorted(set(_core(toks, G))))
+    return " ".join(sorted(set(toks)))
+
+
+def _hash_keys(keys):
+    return pd.util.hash_array(np.asarray(keys, dtype=object), categorize=False).astype(np.uint64)
+
+
+def count_tables_dir(split):
+    return io_utils.work_path("match", "aux", split, "counts.json").parent
+
+
+def build_count_tables(split, lg=None):
+    """work/match/aux/{split}/: per kind, sorted unique key hashes + counts over the split's pool
+    (S2 + S3 text only, split.md rule 5) and the count of every pool record's own key. Rebuilt when the
+    normalized pool file changes."""
+    src = io_utils.work_path("norm", f"{split}_pool.parquet")
+    st = src.stat()
+    stamp = {"norm_pool_size": st.st_size, "norm_pool_mtime_ns": st.st_mtime_ns}
+    d = count_tables_dir(split)
+    done = d / "counts.json"
+    if done.exists() and {k: io_utils.read_json(done).get(k) for k in stamp} == stamp:
+        return d
+    t0 = time.time()
+    G = frozenset(io_utils.read_json(io_utils.work_path("index", split, "meta.json"))["G"])
+    hashes = {k: [] for k in COUNT_KINDS}
+    pf = pq.ParquetFile(src)
+    for b in pf.iter_batches(batch_size=1_000_000, columns=["name_norm", "addr_norm"]):
+        for kind, col in zip(COUNT_KINDS, (b.column(0), b.column(1))):
+            hashes[kind].append(_hash_keys([_count_key(kind, s or "", G) for s in col.to_pylist()]))
+    d.mkdir(parents=True, exist_ok=True)
+    for kind in COUNT_KINDS:
+        h = np.concatenate(hashes[kind])
+        uniq, inv, cnt = np.unique(h, return_inverse=True, return_counts=True)
+        np.save(d / f"{kind}_uniq.npy", uniq)
+        np.save(d / f"{kind}_cnt.npy", cnt.astype(np.uint32))
+        np.save(d / f"pool_{kind}_cnt.npy", cnt[inv].astype(np.uint32))
+    io_utils.atomic_write_json(done, dict(stamp, n_pool=int(pf.metadata.num_rows),
+                                          wall_s=round(time.time() - t0, 1)))
+    if lg:
+        lg.info("count tables %s built in %.0fs", split, time.time() - t0)
+    return d
+
+
+def query_counts(split, kind, texts):
+    """log1p(pool count of each text's key); NaN for empty text."""
+    d = count_tables_dir(split)
+    G = frozenset(io_utils.read_json(io_utils.work_path("index", split, "meta.json"))["G"])
+    uniq, cnt = np.load(d / f"{kind}_uniq.npy"), np.load(d / f"{kind}_cnt.npy")
+    h = _hash_keys([_count_key(kind, s, G) for s in texts])
+    pos = np.minimum(np.searchsorted(uniq, h), max(uniq.size - 1, 0))
+    c = np.where(uniq[pos] == h, cnt[pos], 0).astype(np.float64)
+    out = np.log1p(c)
+    out[np.array([not s for s in texts], dtype=bool)] = NAN
+    return out
+
+
+# ---------------------------------------------------------------- TF-IDF char n-gram IDF (unsupervised)
+
+def tfidf_dir(split):
+    return io_utils.work_path("match", "aux", split, "tfidf_meta.json").parent
+
+
+def _tfidf_hv():
+    """HashingVectorizer shared by the IDF build and by every worker's per-chunk transform: char n-grams
+    (word-boundary-padded) 2-4, hashed to TFIDF_N_FEATURES dims, raw (unweighted, unnormalized) counts."""
+    from sklearn.feature_extraction.text import HashingVectorizer
+    return HashingVectorizer(analyzer="char_wb", ngram_range=(2, 4), n_features=TFIDF_N_FEATURES,
+                             alternate_sign=False, norm=None)
+
+
+def build_tfidf_idf(split, lg=None):
+    """F2: char n-gram document frequency, counted unsupervised over the split's pool (S2 + S3 text only,
+    split.md rule 5), for name_norm and addr_norm separately. idf(feature) = ln((1 + N) / (1 + df)) + 1,
+    N = pool record count, df = number of pool records whose hashed n-gram set contains that feature.
+    Saved as work/match/aux/{split}/tfidf_{name,addr}_idf.npy (float32, length TFIDF_N_FEATURES) plus a
+    stamp json; rebuilt when the normalized pool file changes (same staleness check as
+    build_count_tables)."""
+    src = io_utils.work_path("norm", f"{split}_pool.parquet")
+    st = src.stat()
+    stamp = {"norm_pool_size": st.st_size, "norm_pool_mtime_ns": st.st_mtime_ns, "n_features": TFIDF_N_FEATURES}
+    d = tfidf_dir(split)
+    done = d / "tfidf_meta.json"
+    if done.exists() and {k: io_utils.read_json(done).get(k) for k in stamp} == stamp:
+        return d
+    t0 = time.time()
+    hv = _tfidf_hv()
+    pf = pq.ParquetFile(src)
+    n_pool = pf.metadata.num_rows
+    df = {kind: np.zeros(TFIDF_N_FEATURES, dtype=np.int64) for kind in ("name", "addr")}
+    for b in pf.iter_batches(batch_size=200_000, columns=["name_norm", "addr_norm"]):
+        for kind, col in zip(("name", "addr"), (b.column(0), b.column(1))):
+            texts = [s or "" for s in col.to_pylist()]
+            X = hv.transform(texts)
+            X.data[:] = 1.0  # binarize term counts -> per-doc feature presence, so the row sum is df
+            df[kind] += np.asarray(X.sum(axis=0)).ravel().astype(np.int64)
+    d.mkdir(parents=True, exist_ok=True)
+    for kind in ("name", "addr"):
+        idf = (np.log((1.0 + n_pool) / (1.0 + df[kind])) + 1.0).astype(np.float32)
+        np.save(d / f"tfidf_{kind}_idf.npy", idf)
+    io_utils.atomic_write_json(done, dict(stamp, n_pool=int(n_pool), wall_s=round(time.time() - t0, 1)))
+    if lg:
+        lg.info("tfidf idf %s built in %.0fs (n_pool=%d)", split, time.time() - t0, n_pool)
+    return d
+
+
+def tfidf_pair_cosine(hv, idf, q_texts, p_texts, bounds):
+    """Cosine similarity of the IDF-weighted hashed char n-gram vectors, one value per pool row of a
+    _feature_chunk task. `q_texts` is one text per S1 group (len = len(bounds)); `p_texts` is one text per
+    pool row of the whole chunk (len = sum of group sizes). Vectorizes the chunk's DISTINCT query and pool
+    strings once each and computes each pair's cosine as a row-wise sparse dot product -- no S1 x pool
+    dense matrix is built, per plan/FEATURE_EXPERIMENTS.md X1 F2. Zero-vector rows (e.g. empty text) get
+    cosine 0.0 here; callers that need NaN for empty text (addresses) mask it in after the call."""
+    from sklearn.preprocessing import normalize
+    n_rows = len(p_texts)
+    q_uniq, q_inv = np.unique(np.asarray(q_texts, dtype=object), return_inverse=True)
+    p_uniq, p_inv = np.unique(np.asarray(p_texts, dtype=object), return_inverse=True)
+    Xq = normalize(hv.transform(q_uniq.tolist()).multiply(idf).tocsr(), norm="l2", copy=False)
+    Xp = normalize(hv.transform(p_uniq.tolist()).multiply(idf).tocsr(), norm="l2", copy=False)
+    row_group = np.empty(n_rows, dtype=np.int64)
+    for k, (a, b) in enumerate(bounds):
+        row_group[a:b] = k
+    Xq_full = Xq[q_inv[row_group]]
+    Xp_full = Xp[p_inv]
+    return np.asarray(Xq_full.multiply(Xp_full).sum(axis=1)).ravel().astype(np.float32)
+
+
+def tfidf_addr_cosine(hv, idf, q_addrs, p_addr, bounds):
+    """tfidf_pair_cosine for addresses, with the empty-address rule: NaN (not 0.0) wherever either side's
+    address is empty, since an empty address carries no evidence either way (plan/FEATURE_EXPERIMENTS.md
+    X1 F2)."""
+    cos = tfidf_pair_cosine(hv, idf, q_addrs, p_addr, bounds)
+    p_empty = np.array([not s for s in p_addr], dtype=bool)
+    q_empty_row = np.zeros(len(p_addr), dtype=bool)
+    for qaddr, (a, b) in zip(q_addrs, bounds):
+        if not qaddr:
+            q_empty_row[a:b] = True
+    cos[q_empty_row | p_empty] = NAN
+    return cos
 
 
 # ---------------------------------------------------------------- feature build (workers)
@@ -296,14 +573,26 @@ def _init_worker(split):
     from ber.rerank import PoolTextReader  # heavy import only in workers that need it
     _W["ptr"] = PoolTextReader(split)
     _W["idf"] = TokenIdf(split)
+    d = count_tables_dir(split)
+    _W["pool_cnt"] = {k: np.load(d / f"pool_{k}_cnt.npy", mmap_mode="r") for k in COUNT_KINDS}
+    _W["hv"] = _tfidf_hv()
+    td = tfidf_dir(split)
+    _W["tfidf_idf"] = {k: np.load(td / f"tfidf_{k}_idf.npy") for k in ("name", "addr")}
+
+
+def _pool_cnt(kind, pool_idx, texts):
+    c = np.log1p(np.asarray(_W["pool_cnt"][kind][pool_idx], dtype=np.float64))
+    c[np.array([not s for s in texts], dtype=bool)] = NAN
+    return c
 
 
 def _feature_chunk(task):
-    """task = (s1 list, per-s1 (name, addr, country, chain), pool_idx, p_rerank, rank, bounds)."""
+    """task = (per-s1 (name, addr, country, chain, name_cnt, addr_cnt), pool_idx, p_rerank, rank, bounds)."""
     q_rows, pool_idx, p_rerank, rank, bounds = task
     ptr, idf = _W["ptr"], _W["idf"]
     p_name, p_addr, p_country = ptr.name(pool_idx), ptr.addr(pool_idx), ptr.country(pool_idx)
     p_src, p_indic = ptr.src(pool_idx), ptr.indic(pool_idx)
+    p_ncnt, p_acnt = _pool_cnt("name", pool_idx, p_name), _pool_cnt("addr", pool_idx, p_addr)
     name_idf = idf.table("NT", [t for s in p_name for t in s.split()]
                          + [t for q in q_rows for t in q[0].split()])
     addr_idf = idf.table("AT", [t for s in p_addr for t in s.split()]
@@ -312,13 +601,24 @@ def _feature_chunk(task):
     X[:, _COL["p_rerank"]] = p_rerank
     X[:, _COL["rank"]] = rank
     lo_pair = _COL["n_tset"]
-    for (qname, qaddr, qcountry, qchain), (a, b) in zip(q_rows, bounds):
-        q = {"name": qname, "addr": qaddr, "country": qcountry, "chain": qchain}
+    hi_pair = _COL["n_tfidf_cos"]  # last two PAIR_FEATURES (tfidf cosines) are filled separately below
+    for (qname, qaddr, qcountry, qchain, qncnt, qacnt), (a, b) in zip(q_rows, bounds):
+        q = {"name": qname, "addr": qaddr, "country": qcountry, "chain": qchain,
+             "name_cnt": qncnt, "addr_cnt": qacnt}
         for i in range(a, b):
             p = {"name": p_name[i], "addr": p_addr[i], "country": p_country[i],
-                 "src": int(p_src[i]), "indic": bool(p_indic[i])}
-            X[i, lo_pair:len(PAIR_FEATURES)] = pair_features(q, p, name_idf, addr_idf, idf.G)
+                 "src": int(p_src[i]), "indic": bool(p_indic[i]),
+                 "name_cnt": float(p_ncnt[i]), "addr_cnt": float(p_acnt[i])}
+            X[i, lo_pair:hi_pair] = pair_features(q, p, name_idf, addr_idf, idf.G)
         list_features(X[a:b])
+
+    # F2 TF-IDF char n-gram cosine (name, address): vectorized once per chunk over distinct strings, not
+    # per pair and never as a dense S1 x pool matrix (plan/FEATURE_EXPERIMENTS.md X1).
+    hv = _W["hv"]
+    q_names = [q[0] for q in q_rows]
+    q_addrs = [q[1] for q in q_rows]
+    X[:, _COL["n_tfidf_cos"]] = tfidf_pair_cosine(hv, _W["tfidf_idf"]["name"], q_names, p_name, bounds)
+    X[:, _COL["a_tfidf_cos"]] = tfidf_addr_cosine(hv, _W["tfidf_idf"]["addr"], q_addrs, p_addr, bounds)
     return X
 
 
@@ -337,11 +637,12 @@ def _s1_inputs(split, s1_idx):
     return names, addrs, country, np.asarray(chain)
 
 
-def _tasks(cand, qpos, names, addrs, country, chain, uniq, start, stop, chunk):
+def _tasks(cand, qpos, names, addrs, country, chain, ncnt, acnt, uniq, start, stop, chunk):
     for lo in range(0, uniq.size, chunk):
         hi = min(lo + chunk, uniq.size)
         a0, b0 = int(start[lo]), int(stop[hi - 1])
-        rows = [(names[j], addrs[j], country[j], int(chain[j])) for j in qpos[lo:hi]]
+        rows = [(names[j], addrs[j], country[j], int(chain[j]), float(ncnt[j]), float(acnt[j]))
+                for j in qpos[lo:hi]]
         bounds = list(zip((start[lo:hi] - a0).tolist(), (stop[lo:hi] - a0).tolist()))
         yield (rows, cand["pool_idx"][a0:b0], cand["p_rerank"][a0:b0], cand["rank"][a0:b0], bounds)
 
@@ -361,6 +662,9 @@ def run_match_features(args):
                                 str(io_utils.paths()["work_root"] / "candidates" / "TEST"))
     cand = read_candidates(set_name, s1_idx)
     names, addrs, country, chain = _s1_inputs(split, s1_idx)
+    build_count_tables(split, lg)
+    build_tfidf_idf(split, lg)
+    ncnt, acnt = query_counts(split, "name", names), query_counts(split, "addr", addrs)
     uniq, start, stop = group_bounds(cand["s1_idx"])
     qpos = np.searchsorted(s1_idx, uniq)
 
@@ -369,7 +673,8 @@ def run_match_features(args):
     for old in out_dir.glob("part-*.parquet"):
         old.unlink()
     workers = args.workers or io_utils.n_workers(cfg)
-    tasks = _tasks(cand, qpos, names, addrs, country, chain, uniq, start, stop, mcfg["chunk_queries"])
+    tasks = _tasks(cand, qpos, names, addrs, country, chain, ncnt, acnt, uniq, start, stop,
+                   mcfg["chunk_queries"])
     part_rows = mcfg["part_queries"] // mcfg["chunk_queries"]
     buf, n_part, row0, n_rows = [], 0, 0, 0
     with io_utils.spawn_pool(workers, _init_worker, (split,)) as pool:
@@ -603,6 +908,26 @@ def calibrate(p_raw, calib):
     return np.interp(p_raw, calib["x"], calib["y"]).astype(np.float32)
 
 
+def paired_delta(fa, fb, n_boot=1000, seed=0):
+    """Mean per-entity difference fa - fb over the same queries, with a 95% bootstrap CI (resampling S1
+    rows) and the number of entities whose score changed."""
+    d = np.asarray(fa, dtype=np.float64) - np.asarray(fb, dtype=np.float64)
+    rng = np.random.default_rng(seed)
+    boots = np.array([d[rng.integers(0, d.size, d.size)].mean() for _ in range(n_boot)]) if d.size else [0.0]
+    return {"delta": float(d.mean()) if d.size else 0.0, "ci95": [float(np.percentile(boots, 2.5)),
+                                                                   float(np.percentile(boots, 97.5))],
+            "n_changed": int((d != 0).sum()), "n": int(d.size)}
+
+
+def adopt(cmp, min_gain):
+    """Adopt the alternative only if the paired gain reaches min_gain and its CI excludes zero."""
+    return cmp["delta"] >= min_gain and cmp["ci95"][0] > 0
+
+
+def runs_dir(run):
+    return io_utils.work_path("match", "runs", run, "x").parent
+
+
 def predict_raw(X, models_dir, n_folds):
     import lightgbm as lgb
     p = np.zeros(X.shape[0], dtype=np.float64)
@@ -625,7 +950,9 @@ def run_match_train(args):
     if set_name != "MATCH_TRAIN":
         raise ValueError("match-train fits on MATCH_TRAIN only: MATCH_VALID confirms, HOLDOUT_TEST (val-S1) "
                          "is scoring-only (split.md rule 4), and other train-S1 slices trained stage 1/2")
-    X, s1, pool, meta = load_features(set_name, fp)
+    X_all, s1, pool, meta = load_features(set_name, fp)
+    feats = used_features(mcfg)
+    X = X_all[:, [_COL[f] for f in feats]]
     if meta["limited"]:
         lg.warning("training on a --limit feature set (%d queries): smoke run only", meta["n_queries"])
     y = pair_labels(s1, pool)
@@ -633,19 +960,23 @@ def run_match_train(args):
     if meta["limited"]:
         queries = queries[:meta["n_queries"]]
     threads = args.workers or io_utils.n_workers(cfg)
-    lg.info("match-train: %d rows, %d queries, positive rate %.4f", y.size, queries.size, y.mean())
+    run = getattr(args, "run", None)
+    lg.info("match-train%s: %d rows, %d queries, %d features, positive rate %.4f",
+            f" [{run}]" if run else "", y.size, queries.size, len(feats), y.mean())
 
     models_dir = io_utils.work_path("match", "models", "x").parent
     oof = np.zeros(y.size, dtype=np.float64)
     folds = []
+    # Fold membership depends only on the set of S1 (shuffled unique groups), so two runs over the same
+    # queries share folds even when their candidate lists differ: per-entity OOF scores are paired.
     gkf = GroupKFold(n_splits=mcfg["n_folds"], shuffle=True, random_state=mcfg["fold_seed"])
-    gain = np.zeros(len(FEATURES))
+    gain = np.zeros(len(feats))
     for k, (tr, te) in enumerate(gkf.split(X, y, s1)):
         gss = GroupShuffleSplit(n_splits=1, test_size=mcfg["early_stop_frac"],
                                 random_state=mcfg["fold_seed"] + k)
         fit_i, es_i = next(gss.split(tr, groups=s1[tr]))
         fit_i, es_i = tr[fit_i], tr[es_i]
-        dfit = lgb.Dataset(X[fit_i], label=y[fit_i], feature_name=FEATURES, free_raw_data=False)
+        dfit = lgb.Dataset(X[fit_i], label=y[fit_i], feature_name=feats, free_raw_data=False)
         des = lgb.Dataset(X[es_i], label=y[es_i], reference=dfit, free_raw_data=False)
         booster = lgb.train(_lgb_params(mcfg, threads), dfit, num_boost_round=mcfg["num_boost_round"],
                             valid_sets=[des], valid_names=["early_stop"],
@@ -671,7 +1002,7 @@ def run_match_train(args):
     scorer = Scorer(queries, s1, y, true_counts(queries))
     dcfg = mcfg["decision"]
     grid = threshold_grid(dcfg)
-    p_rr = X[:, _COL["p_rerank"]]
+    p_rr = X_all[:, _COL["p_rerank"]]
     floor_sweep = {float(t): scorer.f05(p_rr >= t) for t in grid}
     floor_t = max(floor_sweep, key=floor_sweep.get)
     candidates = {}
@@ -679,46 +1010,69 @@ def run_match_train(args):
         pc = one_owner(pool, p_cal) if owner else p_cal
         sweep = {float(t): scorer.f05(pc >= t) for t in grid}
         t_best = max(sweep, key=sweep.get)
-        candidates[("threshold", owner)] = ({"rule": "threshold", "threshold": t_best, "one_owner": owner},
-                                            sweep[t_best], sweep)
+        dec = {"rule": "threshold", "threshold": t_best, "one_owner": owner}
+        candidates[("threshold", owner)] = (dec, scorer.per_entity(apply_decision(dec, s1, pool, p_cal))[0],
+                                            sweep)
         dec = {"rule": "expected_f", "threshold": None, "one_owner": owner}
-        candidates[("expected_f", owner)] = (dec, scorer.f05(apply_decision(dec, s1, pool, p_cal)), None)
-    base_rule = "threshold"
-    if candidates[("expected_f", False)][1] >= candidates[("threshold", False)][1] + dcfg["expected_f_min_gain"]:
-        base_rule = "expected_f"
-    use_owner = candidates[(base_rule, True)][1] > candidates[(base_rule, False)][1] + dcfg["one_owner_min_gain"]
-    decision, oof_f05, _ = candidates[(base_rule, use_owner)]
+        candidates[("expected_f", owner)] = (dec, scorer.per_entity(apply_decision(dec, s1, pool, p_cal))[0],
+                                             None)
+    # Paired comparisons on the same OOF queries; an alternative is adopted only when the gain reaches the
+    # configured minimum and its 95% bootstrap CI excludes zero (no adoption on noise).
+    rule_cmp = {"expected_f_vs_threshold": paired_delta(candidates[("expected_f", False)][1],
+                                                        candidates[("threshold", False)][1])}
+    base_rule = "expected_f" if adopt(rule_cmp["expected_f_vs_threshold"], dcfg["expected_f_min_gain"]) \
+        else "threshold"
+    rule_cmp["one_owner"] = paired_delta(candidates[(base_rule, True)][1], candidates[(base_rule, False)][1])
+    use_owner = adopt(rule_cmp["one_owner"], dcfg["one_owner_min_gain"])
+    decision, _, _ = candidates[(base_rule, use_owner)]
 
     keep = apply_decision(decision, s1, pool, p_cal)
     report, per_entity = scorer.report(keep, p_cal)
+    oof_f05 = report["f05"]
     floor_report, _ = scorer.report(p_rr >= floor_t)
-    lg.info("OOF entity F0.5 %.4f (rule %s, one_owner %s) vs re-ranker-score floor %.4f @ %.2f",
-            oof_f05, decision["rule"], decision["one_owner"], floor_sweep[floor_t], floor_t)
+    lg.info("OOF entity F0.5 %.5f (rule %s, one_owner %s) vs re-ranker-score floor %.4f @ %.2f; rule "
+            "comparisons %s", oof_f05, decision["rule"], decision["one_owner"], floor_sweep[floor_t], floor_t,
+            rule_cmp)
 
-    model_doc = {"features": FEATURES, "n_folds": mcfg["n_folds"], "bucketing_fingerprint": fp,
+    model_doc = {"features": FEATURES, "features_used": feats, "n_folds": mcfg["n_folds"],
+                 "bucketing_fingerprint": fp, "run": run,
                  "train_set": set_name, "train_limited": meta["limited"], "calibration": calib,
                  "decision": decision, "floor_threshold": floor_t, "oof_f05": oof_f05,
                  "oof_floor_f05": floor_sweep[floor_t],
                  "match_config": mcfg, "created_at": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
     io_utils.atomic_write_json(models_dir / "matcher.json", model_doc)
+    if run:
+        rd = runs_dir(run)
+        (rd / "models").mkdir(parents=True, exist_ok=True)
+        for k in range(mcfg["n_folds"]):
+            (rd / "models" / f"model_fold{k}.txt").write_bytes((models_dir / f"model_fold{k}.txt").read_bytes())
+        io_utils.atomic_write_json(rd / "models" / "matcher.json", model_doc)
+        np.save(rd / "queries.npy", queries)
+        np.save(rd / "OOF_per_entity.npy", per_entity)
+        pq.write_table(pa.table({"s1_idx": s1, "pool_idx": pool, "y": y, "p_raw": oof.astype(np.float32),
+                                 "p_cal": p_cal}), rd / "oof.parquet", compression="zstd")
 
-    err = export_errors(s1, pool, y, keep, p_cal, p_rr, X[:, _COL["rank"]], queries,
+    err = export_errors(s1, pool, y, keep, p_cal, p_rr, X_all[:, _COL["rank"]], queries,
                         mcfg["error_export_max_rows"], lg)
     payload = {
-        "set": set_name, "limited": meta["limited"], "n_rows": int(y.size), "positive_rate": float(y.mean()),
+        "set": set_name, "run": run, "limited": meta["limited"], "n_rows": int(y.size),
+        "positive_rate": float(y.mean()), "features_used": feats,
         "folds": folds, "decision": decision, "oof": report,
-        "oof_rule_scores": {f"{r}{'+one_owner' if o else ''}": v[1] for (r, o), v in candidates.items()},
+        "oof_rule_scores": {f"{r}{'+one_owner' if o else ''}": float(v[1].mean())
+                            for (r, o), v in candidates.items()},
+        "rule_comparisons": rule_cmp,
         "oof_threshold_sweep": {str(t): v for t, v in candidates[("threshold", False)][2].items()},
         "floor": {"threshold": floor_t, "f05": floor_sweep[floor_t], "report": floor_report},
         "gain_vs_floor": oof_f05 - floor_sweep[floor_t],
         "calibration_reliability": reliability(p_cal, y),
-        "feature_gain": dict(sorted(((f, float(g / mcfg["n_folds"])) for f, g in zip(FEATURES, gain)),
+        "feature_gain": dict(sorted(((f, float(g / mcfg["n_folds"])) for f, g in zip(feats, gain)),
                                     key=lambda kv: -kv[1])),
         "segments": segment_scores(queries, per_entity, meta["split"]),
         "error_files": err, "wall_s": round(time.time() - t0, 1),
         "peak_rss_mb": round(io_utils.peak_rss_mb(), 1),
     }
-    io_utils.write_metrics("match_train", payload, queries.size, int(scorer.n_true.sum()), cfg)
+    io_utils.write_metrics(f"match_train_{run}" if run else "match_train", payload, queries.size,
+                           int(scorer.n_true.sum()), cfg)
     lg.info("match-train done in %.0fs", time.time() - t0)
 
 
@@ -826,7 +1180,8 @@ def load_matcher(cfg):
 
 def score_set(set_name, doc, models_dir):
     X, s1, pool, meta = load_features(set_name, doc["bucketing_fingerprint"])
-    p_cal = calibrate(predict_raw(X, models_dir, doc["n_folds"]), doc["calibration"])
+    cols = [_COL[f] for f in doc.get("features_used", FEATURES)]
+    p_cal = calibrate(predict_raw(X[:, cols], models_dir, doc["n_folds"]), doc["calibration"])
     keep = apply_decision(doc["decision"], s1, pool, p_cal)
     return X, s1, pool, meta, p_cal, keep
 
@@ -863,9 +1218,36 @@ def run_match_eval(args):
     if set_name == "MATCH_VALID" and payload["drop_vs_oof"] > doc["match_config"]["confirm_tolerance"]:
         payload["confirm_alarm"] = "MATCH_VALID F0.5 is more than confirm_tolerance below OOF; investigate"
         lg.warning(payload["confirm_alarm"])
-    io_utils.write_metrics(f"match_eval_{set_name}", payload, queries.size, int(scorer.n_true.sum()), cfg)
+    run = doc.get("run")
+    payload["run"] = run
+    name = f"match_eval_{set_name}"
+    if run and set_name == "MATCH_VALID":  # HOLDOUT_TEST keeps one fixed file name (scored-once guard)
+        name += f"_{run}"
+        np.save(runs_dir(run) / "MATCH_VALID_per_entity.npy", per_entity)
+    io_utils.write_metrics(name, payload, queries.size, int(scorer.n_true.sum()), cfg)
     lg.info("match-eval %s: F0.5 %.4f (floor %.4f, ceiling %.4f, OOF %.4f)", set_name, report["f05"],
             floor_report["f05"], report["ceiling"], doc["oof_f05"])
+
+
+def run_match_compare(args):
+    """Paired comparison of two `match-train --run` runs on the same queries (OOF of MATCH_TRAIN or
+    MATCH_VALID): mean per-entity F0.5 delta b - a, 95% bootstrap CI, per-segment deltas."""
+    cfg = io_utils.load_config()
+    lg = io_utils.get_logger("match-compare")
+    fa, fb = (np.load(runs_dir(r) / f"{args.set}_per_entity.npy") for r in (args.a, args.b))
+    queries = set_queries("MATCH_TRAIN" if args.set == "OOF" else args.set)
+    if not (fa.size == fb.size == queries.size):
+        raise RuntimeError("runs were scored on different query sets")
+    from ber.evaluate import segment_data
+    masks = dict(segment_data(queries, np.zeros(0, dtype=np.uint32))["query"])
+    masks["singleton"] = true_counts(queries) == 0
+    payload = {"a": args.a, "b": args.b, "set": args.set, "f05_a": float(fa.mean()), "f05_b": float(fb.mean()),
+               "b_minus_a": paired_delta(fb, fa, n_boot=2000),
+               "segments": {k: dict(paired_delta(fb[m], fa[m], n_boot=500), f05_a=float(fa[m].mean()))
+                            for k, m in masks.items() if m.any()}}
+    io_utils.write_metrics(f"compare_{args.a}_vs_{args.b}_{args.set}", payload, queries.size, 0, cfg)
+    lg.info("%s: %s %.5f -> %s %.5f, delta %s", args.set, args.a, fa.mean(), args.b, fb.mean(),
+            payload["b_minus_a"])
 
 
 def write_matching_file(path, s1_ids, s1_idx, pool_idx, src, num):
