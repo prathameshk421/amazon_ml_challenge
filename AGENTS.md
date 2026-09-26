@@ -31,6 +31,7 @@ Details: `data/student_resource/dataset/split.md`.
 - Install into the project venv, not `--user` / system Python.
 - Update `PROGRESS.md` when you finish a real phase (ingest, index, a named experiment), not after every tiny edit.
 - Every experiment run (including dropped, flat, and failed ones), adoption decision, val-S1 score, and leaderboard upload gets an entry in `RESEARCH_LOG.md`, newest first, using its template. Every number cites its `artifacts/metrics/*.json`. Read its **Current best** and **Open questions** before starting new work. Experiment procedure: `plan/EXPERIMENT_ROUTINE.md`; validation rules: `plan/VALIDATION_PLAN.md`.
+- Before setting `num_boost_round`/a round cap for any LightGBM training run, read `plan/ROUND_CAP_EVIDENCE.md` — a fixed cap sized for one data scale has already been measured to be too low at the next scale up, twice. Check every fold's `best_iteration` against its cap after the run and say so explicitly if any fold was truncated (hit the cap) rather than converged; append the run's numbers to that file's table either way.
 - You may print samples, diffs, and stack traces. Do not dump entire multi-million-row TSVs into chat.
 - `[goal:complete]` / `[goal:blocked]` / `logs/STOP` / `pmset` / “never ask the user” do **not** apply anymore.
 
