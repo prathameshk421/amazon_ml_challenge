@@ -230,7 +230,7 @@
     "value": false
    },
    "rerank.cut.K_min": {
-    "experiment": "rerank-cut",
+    "experiment": "revert: teammate's ADDRESS_EXPERIMENTS.md S4 already measured K_min widening (ceiling +0.002 past K=5, not worth it); K_min stays 5, keep the matcher feature gain instead (k5_feat vs k5_base OOF +0.00211 CI[0.00190,0.00235])",
     "metrics": "artifacts/metrics/rerank_cut.json",
     "value": 5
    },
@@ -246,42 +246,42 @@
    }
   }
  },
- "config_hash": "fc7811e23cb9358ab31b04e2b784fe8516779e5d",
+ "config_hash": "94241292b8cdffae19b4574cddafde111bd9aceb",
  "norm_version": "2.1",
- "git_commit": "c050879dbefa72e76d7ea9d6ebd6530e11198aa8",
- "created_at": "2026-09-26T00:01:04+05:30",
+ "git_commit": "c18d6065d545937ebe233dac93f2f04f9a0f3730",
+ "created_at": "2026-09-26T16:52:48+05:30",
  "decision": {
   "rule": "threshold",
-  "threshold": 0.7,
+  "threshold": 0.69,
   "one_owner": true
  },
  "rows": 1732544,
- "pairs": 5688259,
+ "pairs": 5789591,
  "per_country": {
   "France": {
    "n_s1": 259452,
-   "mean_pred_size": 3.284996839492469,
-   "share_empty": 0.05560180688528128,
-   "mean_max_p": 0.9536528491963561
+   "mean_pred_size": 3.284919753942926,
+   "share_empty": 0.05763686539321339,
+   "mean_max_p": 0.9502385531930987
   },
   "India": {
    "n_s1": 809986,
-   "mean_pred_size": 3.241328862474166,
-   "share_empty": 0.062230705222065565,
-   "mean_max_p": 0.941500516399351
+   "mean_pred_size": 3.285285177768505,
+   "share_empty": 0.060978831732894145,
+   "mean_max_p": 0.9417819501436205
   },
   "US": {
    "n_s1": 663106,
-   "mean_pred_size": 3.3335982482438706,
-   "share_empty": 0.05904485858972774,
-   "mean_max_p": 0.9439786196421018
+   "mean_pred_size": 3.432749816771376,
+   "share_empty": 0.058232017203885954,
+   "mean_max_p": 0.9443170870547808
   }
  },
  "file": "/Volumes/SSD/Projects/Hackathons/amazon_ml_challenge/work/outputs/matching_results.tsv",
- "file_bytes": 95750781,
+ "file_bytes": 97055937,
  "check": {
   "passed": true,
   "issues": []
  },
- "wall_s": 1805.7
+ "wall_s": 1640.2
 }

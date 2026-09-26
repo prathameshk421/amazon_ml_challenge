@@ -30,6 +30,8 @@ COMMANDS = {
     "match-eval": ("match", "run_match_eval"),
     "match-predict": ("match", "run_match_predict"),
     "match-compare": ("match", "run_match_compare"),
+    "exp-train": ("exp", "run_exp_train"),
+    "exp-predict": ("exp", "run_exp_predict"),
 }
 
 
@@ -78,6 +80,9 @@ def build_parser():
     mc.add_argument("--a", required=True, help="baseline run")
     mc.add_argument("--b", required=True, help="challenger run")
     mc.add_argument("--set", choices=("OOF", "MATCH_VALID"), default="OOF")
+    parsers["exp-train"].add_argument("--exp", required=True, help="exps/<id>.json")
+    parsers["exp-train"].add_argument("--workers", type=int)
+    parsers["exp-predict"].add_argument("--run", required=True)
     return p
 
 

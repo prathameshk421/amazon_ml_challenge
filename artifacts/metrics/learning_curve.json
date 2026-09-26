@@ -248,8 +248,8 @@
  },
  "config_hash": "94241292b8cdffae19b4574cddafde111bd9aceb",
  "norm_version": "2.1",
- "git_commit": "86c9f9bc9ce8d90007810821c644262e868895cd",
- "created_at": "2026-09-26T12:10:57+05:30",
+ "git_commit": "c18d6065d545937ebe233dac93f2f04f9a0f3730",
+ "created_at": "2026-09-26T15:39:50+05:30",
  "points": [
   {
    "n_queries": 45000,
@@ -365,6 +365,75 @@
    ],
    "wall_s": 1225.6,
    "source": "dev_rest_180k.py: MATCH_TRAIN + 180k new DEV_REST S1"
+  },
+  {
+   "n_queries": 1655458,
+   "n_rows": 8979983,
+   "oof_f05": 0.9822139032574392,
+   "threshold": 0.62,
+   "one_owner": true,
+   "folds": [
+    {
+     "fold": 0,
+     "best_iteration": 4000,
+     "n_fit_rows": 6465966,
+     "hit_cap": true
+    },
+    {
+     "fold": 1,
+     "best_iteration": 3998,
+     "n_fit_rows": 6464544,
+     "hit_cap": false
+    },
+    {
+     "fold": 2,
+     "best_iteration": 3988,
+     "n_fit_rows": 6465762,
+     "hit_cap": false
+    },
+    {
+     "fold": 3,
+     "best_iteration": 3996,
+     "n_fit_rows": 6465482,
+     "hit_cap": false
+    },
+    {
+     "fold": 4,
+     "best_iteration": 4000,
+     "n_fit_rows": 6466362,
+     "hit_cap": true
+    }
+   ],
+   "num_boost_round_override": 4000,
+   "any_fold_hit_cap": true,
+   "loss_breakdown": {
+    "singleton_with_fp": {
+     "n_entities": 1101,
+     "loss": 0.0006650727472397367
+    },
+    "matched_fp_only": {
+     "n_entities": 18411,
+     "loss": 0.002570438643870483
+    },
+    "matched_missed_only": {
+     "n_entities": 102942,
+     "loss": 0.007617266642218513
+    },
+    "matched_fp_and_missed": {
+     "n_entities": 1646,
+     "loss": 0.00031998056476375804
+    },
+    "blocking_miss_only": {
+     "n_entities": 111230,
+     "loss": 0.006613338144468365
+    }
+   },
+   "segments_report": {
+    "singleton_accuracy": 0.9881019278983315,
+    "candidate_recall_retained": 0.9799484408924437
+   },
+   "wall_s": 6423.6,
+   "source": "dev_rest_full.py: full MATCH_ALL (MATCH_TRAIN+MATCH_VALID+DEV_REST)"
   }
  ],
  "note": "45k/90k random subsets of MATCH_TRAIN S1 (seed 42, unstratified); 180k point is x1_strsim itself, not rerun. Same 5-fold GroupKFold/LightGBM params/isotonic calibration/threshold+one_owner search as match-train. No feature rebuild, no state written to work/match/models/ or configs/match.json."

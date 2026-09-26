@@ -25,7 +25,34 @@ is the fix — a measured table, and a mechanical check to run after every train
 | k5_feat (180,000 S1) | 975,699 | ~702,500 | 3000 | 1448, 1703, 1927, 1901, 1724 | No |
 | x1_strsim (180,000 S1) | 975,699 | ~702,500 | 3000 | 1651, 1819, 2011, 1908, 1574 | No |
 | dev_rest_180k (360,000 S1) | 1,952,601 | ~1,405,900 | 3000 | 2997, 2424, 2566, 2727, **3000** | Yes, 2 of 5 |
-| dev_rest_full (1,655,458 S1) | 8,979,983 | ~6,465,600 | 4000 | **4000**, **3998**, **3988**, (2 folds still running) | Yes, 3 of 3 so far |
+| dev_rest_full (1,655,458 S1) | 8,979,983 | ~6,465,600 | 4000 | **4000**, **3998**, **3988**, **3996**, **4000** | Yes, 5 of 5 (OOF F0.5 0.98221 reported with this caveat) |
+
+| train_final_single (1,655,458 S1, one model) | 8,979,983 | 7,633,743 | 12000 | **8208** (converged) | No |
+| train_final_comp (1,655,458 S1, one model, 75 features incl. comp) | 8,979,983 | 7,633,743 | 12000 | 6524 (converged) | No (`match_train_full_comp.json`) |
+
+| exp R0 main (180,000 S1) | 975,699 | ~702,500 | 3000 | 1651, 1819, 2011, 1908, 1574 | No (`exp_R0.json`) |
+| exp M005 main (180,000 S1) | 975,699 | ~702,500 | 3000 | 1758, 1672, 1538, 1465, 1200 | No (`exp_M005.json`) |
+| exp M006 main (180,000 S1) | 975,699 | ~702,500 | 3000 | 1990, 1936, 1814, 1528, 1733 | No (`exp_M006.json`) |
+| exp M007 main (180,000 S1) | 975,699 | ~702,500 | 3000 | 1828, 2187, 2037, 1782, 1787 | No (`exp_M007.json`) |
+| exp M008 main (180,000 S1) | 975,699 | ~702,500 | 3000 | 2168, 2112, 2270, 2411, 1893 | No (`exp_M008.json`) |
+| exp M009 main (180,000 S1) | 975,699 | ~702,500 | 3000 | 1941, 1650, 1830, 2134, 2060 | No (`exp_M009.json`) |
+| exp M010 main (180,000 S1) | 975,699 | ~702,500 | 3000 | 1978, 1892, 1974, 1535, 1719 | No (`exp_M010.json`) |
+| exp M011 spec_name (180,000 S1) | 975,699 | ~702,500 | 3000 | **2999**, **3000**, **2989**, **2994**, **2991** | Yes, 5 of 5 (`exp_M011.json`) |
+| exp M011 spec_addr (180,000 S1) | 975,699 | ~702,500 | 3000 | 1933, 1947, 2197, 2057, 2216 | No (`exp_M011.json`) |
+| exp M011 spec_ctx (180,000 S1) | 975,699 | ~702,500 | 3000 | 935, 1252, 1108, 1075, 1023 | No (`exp_M011.json`) |
+| exp M011 main (180,000 S1) | 975,699 | ~702,500 | 3000 | 720, 625, 793, 745, 695 | No (`exp_M011.json`) |
+| exp M012 main_part2 (180,000 S1) | 975,699 | ~702,500 | 3000 | 935, 1182, 1185, 1248, 1114 | No (`exp_M012.json`) |
+| exp M012 main_part3 (180,000 S1) | 975,699 | ~702,500 | 3000 | 1318, 1256, 1415, 1121, 1248 | No (`exp_M012.json`) |
+| exp M013 main (180,000 S1, band rows only) | 975,699 | ~702,500 | 3000 | 119, 116, 122, 135, 152 | No (`exp_M013.json`) |
+
+M011 note: the name-only specialist (n_* columns only) hit the 3000 cap in all 5 folds at 180,000 S1, while the
+full-feature model converges at ~1500-2100: a weaker feature set needs MORE rounds at lr 0.05, so a specialist cap
+must not be copied from the main model's. Re-run specialists with a cap >= 8000 and check again.
+
+First converged measurement at MATCH_ALL scale: one model on ~7.6M fit rows at lr 0.05 needed 8208 rounds
+(`artifacts/metrics/match_train_full_single.json`, `work/logs/submission2.log`) — about 4x the 180k-S1
+runs (~2000) and 2x the 4000 cap the 5-fold MATCH_ALL run was cut at. For MATCH_ALL-scale training at
+lr 0.05, start the cap at >= 12000.
 
 Source files: `artifacts/metrics/match_train_{k5_base,k5_feat,x1_strsim}.json` (`folds[].best_iteration`),
 `work/logs/dev_rest_180k.log`, `work/logs/dev_rest_full.log`.
