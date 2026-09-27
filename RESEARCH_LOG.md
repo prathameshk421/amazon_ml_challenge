@@ -45,7 +45,7 @@ Negative, flat, and failed runs are logged too — they are the part people forg
 | 3 matcher | MATCH_ALL held-out 165K | entity F0.5 | 0.98360 (full_comp; full_single 0.98161 same S1) | M005-full | `match_train_full_comp.json` |
 | 3 matcher | MATCH_ALL − DEV_REST_180K held-out 147K | entity F0.5 | 0.98537 (full_ce, + p_ce; full_single 0.98162 same S1) | S6-file | `match_train_full_ce.json` |
 | 3 matcher | MATCH_ALL − DEV_REST_180K held-out 147K | entity F0.5 | 0.98551 (full_ce_nf, + nfreq) | S7-file | `match_train_full_ce_nf.json` |
-| submission | test (public LB) | entity F0.5 | **0.983604 (S13)**; S12 0.983064; S11 0.981623; S10 0.98135; S7 0.976205; S6 0.976128; S2 0.966797; S1 0.966109; S3 0.966 (rounded) | S10-LB | `drace_test.json`, `reports/test_usage_log.md` |
+| submission | test (public LB) | entity F0.5 | **0.983958 (S16)**; S14 0.983741; S13 0.983604; S12 0.983064; S11 0.981623; S10 0.98135; S7 0.976205; S6 0.976128; S2 0.966797; S1 0.966109; S3 0.966 (rounded) | S10-LB | `drace_test.json`, `reports/test_usage_log.md` |
 
 ## Open questions
 
@@ -57,6 +57,166 @@ Negative, flat, and failed runs are logged too — they are the part people forg
 ---
 
 ## Log
+
+### 2026-09-27 · FINAL · S16 promoted to the live model · INFO
+- work/match/models now holds full_c0_rgrp at threshold 0.73 (was full_single, 0.69). Rebuild chain for S16:
+  `plan/checks/run_s16.sh`. The D10 test chain referenced in D10 as `run_s14.sh` is now `plan/checks/run_d10_test.sh`
+  (never run to completion; S14 was built by the SD5 steps, see S14-file).
+
+### 2026-09-27 · TH2 · Threshold under test's list-length distribution (train S1 reweighted, test inputs only) · INFO
+- Metrics: `thr_testlike.json` · Script: `plan/checks/thr_testlike.py` · Log: `logs/thr_testlike.log`.
+- Mean candidate list length train 5.42, test 6.13; bucket weights 6-7 1.30, 8-9 1.99, 10-14 4.16, >= 15 52.75 (few train S1:
+  that bucket is noisy).
+- On M027's scale (chosen 0.73 = live 0.70): test-like weighted F0.5 peaks flat at 0.74-0.76 (0.98861), falls from 0.78 on
+  (0.82: −0.00013, 0.86: −0.00038). Maps to live 0.71-0.73, i.e. S16's 0.73 is at the upper end of the train-derived optimum.
+- Decision: no further threshold raise; S16 is the final unless a train-side rule says otherwise.
+
+### 2026-09-27 · S16-LB · Submission 16 leaderboard: S14 with threshold 0.73, 0.983958 · ADOPTED
+- Log: `reports/test_usage_log.md` · File: `submission/output_v16/matching_results.tsv` (sha1 77149494…).
+- Result: public LB 0.983958 vs S14 0.983741: +0.00022. Train evidence was flat (TH1 +0.00000), so the gain is test-specific:
+  consistent with N04 (longer, more uncertain test lists favour a stricter threshold).
+- Caution: stepping the threshold further by LB feedback would be tuning on test (AGENTS rule 5). Any further change must
+  come from a train-side rule (e.g. threshold chosen on train S1 whose lists look like test's).
+
+### 2026-09-27 · S16-file · S14 with the LightGBM threshold raised 0.70 -> 0.73 · INFO (upload candidate, coin flip)
+- Parent: S14-file, TH1, N04 · Metrics: `drace_test_s16.json` · Log: `logs/run_s16_t073.log` · Run: `work/match/runs/full_c0_rgrp_t073`.
+- Test: base pairs 5,728,253 (S14 5,749,212; −20,959, −0.012 per S1); DRACE additions 80,800; final 5,809,053. Validator PASS;
+  sha1 77149494….
+- Evidence: TH1 +0.03 over the chosen threshold +0.00000 on train; N04 (older model) favoured a higher threshold on lists > 5,
+  which test has more of. Expectation (d): LB within ±0.0002 of S14.
+
+### 2026-09-27 · S15-file · S14 with the LightGBM threshold lowered 0.70 -> 0.65 (user request) · INFO (upload candidate, not recommended)
+- Parent: S14-file, TH1 · Metrics: `drace_test_s15.json` · Log: `logs/run_s15_t065.log` · Run: `work/match/runs/full_c0_rgrp_t065`
+  (copy of full_c0_rgrp, only `decision.threshold` changed).
+- Test: base pairs 5,754,915 (S14 base 5,749,212; +5,703, +0.0033 per S1); DRACE additions 80,770; final 5,835,685; 101,111
+  empty S1 (S14 101,278). Validator --check-ids PASS; sha1 12736468….
+- Expectation: TH1 says a 0.05 lower threshold is −0.00004 [−0.00011, +0.00004] on train (singletons −0.00137). LB flat to
+  slightly negative (d).
+
+### 2026-09-27 · TH1 · LightGBM decision threshold under the full S14 pipeline, MATCH_TRAIN · INFO
+- Metrics: `thr_sweep_s14.json` · Script: `plan/checks/thr_sweep_s14.py` · Log: `logs/thr_sweep_s14.log`.
+- M027 OOF + S14 DRACE additions; reference = M027's chosen threshold 0.73 (full_c0_rgrp's own choice is 0.70).
+  0.68 (i.e. −0.05): −0.00004 [−0.00011, +0.00004]; 0.65: −0.00006 [−0.00015, +0.00004]; 0.60: −0.00022; 0.55: −0.00048;
+  0.75: +0.00000; 0.78: −0.00005. Lower thresholds lose on singleton S1 (0.65: −0.00186 on that segment).
+- Learned: the fitted threshold is already at the F0.5 optimum with DRACE in place; lowering it adds false matches
+  that F0.5 punishes, mostly on S1 with no true copy.
+
+### 2026-09-27 · AD1 · Address-only lexical retrieval (binary TF-IDF over address tokens, S1 -> pool top-K) · DROPPED
+- Metrics: `addr_eval.json` · Scripts: `plan/checks/addr_retr.py`, `plan/checks/addr_eval.py` · Logs: `logs/addr_retr_train.log`
+  (77 s for 180K S1 x 10.3M pool, df <= 3000), `logs/addr_eval.log`.
+- Hypothesis (N13): 1,224 missed true pairs have an invented pool name but an address; c0 would admit them.
+- Result: of 6,709 true pairs missed by every S14 channel (incl. D10), top-10 recovers 106 at 6.29 new pairs/S1 (true rate
+  0.009%); oracle +0.00004. Top-3 recovers 40, oracle +0.00002. Not scored with c0 (no point).
+- Learned: the invented-name copies also have corrupted addresses (median address Jaccard 0.29 on missed pairs; examples
+  drop house numbers or city); an address-token query sees hundreds of same-street neighbours and ranks the copy low.
+
+### 2026-09-27 · N13 · What the pairs missed by every S14 channel look like · INFO
+- Metrics: `miss_profile.json` · Scripts: `plan/checks/miss_profile.py`; category counts and c0 check in `logs/miss_types.log`.
+- Missed (MATCH_TRAIN, after lists + untrained e5 S1@5/seed@5 + distilled S1@5): 7,143 true pairs. Pool address empty 5,295;
+  invented name (name Jaccard 0) with address 1,224; other address-bearing 436; Indic-script name 188.
+- Missed vs found (address-bearing): median address Jaccard 0.29 vs 0.67; shared digit token 68% vs 89%.
+- c0 on in-list invented-name pairs with address: 80.7% of 22,688 true at >= 0.995, 8 of 32,347 false — c0 can confirm them,
+  but neither dense (e5) nor lexical address retrieval (AD1) finds them.
+
+### 2026-09-27 · S14-LB · Submission 14 leaderboard: S13 + seed expansion ranks 3-5 0.983741 · ADOPTED
+- Log: `reports/test_usage_log.md` · Metrics: `drace_test_s14.json`, `seed5_eval.json` · File:
+  `submission/output_v14/matching_results.tsv` (sha1 a81c3cd5…).
+- Result: public LB 0.983741 vs S13 0.983604: +0.00014. Train evidence +0.00028; transfer ≈ 0.5x, unlike S12/S13 (2.1-2.3x).
+  Test got 0.66x train's added pairs per S1 (+0.0039 vs +0.0059), which explains most of the shortfall.
+- Learned: seed-expansion depth does not carry the India-heavy test bonus that distilled S1 retrieval did; do not assume
+  a 2x transfer for retrieval changes by default.
+
+### 2026-09-27 · S14-file · S13 + untrained-e5 seed expansion ranks 3-5 (SD5) · INFO (upload candidate)
+- Parent: S13-file, SD5 · Metrics: `drace_test_s14.json` · Log: `logs/run_s14_seed5.log` · HF: seed5-test-c0 (1,944,039 pairs).
+- Same matcher and base as S12/S13 (full_c0_rgrp); DRACE merge at c0 >= 0.995 with extra sets DRACD_TEST, DRACD5_TEST,
+  SEED5_TEST. DRACE additions 80,783 (S13 74,017; +0.0039 per S1 vs +0.0059 per S1 on train); final 5,829,995 pairs;
+  candidates 8.86 per S1. Official validator --check-ids PASS; sha1 a81c3cd5….
+- Expectation (d): train +0.00028; test adds 0.66x train's per-S1 rate; S12/S13 transferred 2.1-2.3x. LB ~0.9838-0.9842.
+- Name-only check (`logs/nameonly_probe.log`, M027 OOF): 121,154 in-list name-only pairs, 17.9% true, p_cal AUC 0.9718;
+  7,582 true rejected (median p_cal 0.30). The highest-scored false pairs include exact-name copies ("Williams Patriot",
+  "Pediatric Vanguard Partners LLC"), i.e. same-name S1 competing for one pool record: not separable from the name alone.
+
+### 2026-09-27 · N12 · Oracle upside of every unused retrieval channel after S13 + seed ranks 3-5 · INFO
+- Metrics: `channel_oracle.json` · Script: `plan/checks/channel_oracle.py` · Log: `logs/channel_oracle.log`.
+- Calibration: untrained seed ranks 3-5 oracle +0.00050, realised +0.00028 (ratio 0.56).
+- Remaining oracle (accept only the new true pairs): untrained seed 6-10 +0.00022 at 10.9 new pairs/S1; seed 6-20 +0.00045
+  at 33.5; distilled seed 1-5 +0.00019 at 5.6; distilled S1 6-7 +0.00011 at 1.7; distilled S1 6-10 +0.00017 at 4.4;
+  untrained S1 6-10 +0.00019 at 3.4; untrained S1 6-20 +0.00043 at 12.1.
+- Learned: after seed ranks 3-5, no single cached channel has a realisable train gain above ~+0.0001 per ~2M test pairs.
+  0.985 on the LB (+0.0014 over S13; ~+0.0006 train at the S12/S13 transfer) is not reachable from retrieval depth alone.
+
+### 2026-09-27 · SD5 · Untrained-e5 seed expansion widened from rank 2 to rank 5 (S14 candidate) · ADOPTED (train gate)
+- Parent: S13-file · Metrics: `seed5_eval.json` · Scripts: `plan/checks/seed5_eval.py`, `plan/checks/seed5_test_pairs.py`
+  · Logs: `logs/seed5_eval.log`, `logs/seed5_test_pairs.log`. Train pairs were already c0-scored (GATE2_TRAIN); test
+  retrieval already existed (drace_test_topk, seed ranks <= 5), so only test scoring was new (HF seed5-test-c0).
+- Result vs S13-equivalent 0.98846: seed<=3 +0.00013 [+0.00011, +0.00014]; seed<=5 +0.00028 [+0.00026, +0.00031]
+  (added 5,621 -> 6,691, 6,553 true); seed<=5 + D10 +0.00033 [+0.00030, +0.00036]; seed<=5 + D10 ranks 6-7 +0.00032.
+- Test: 1,944,039 new pairs to score (seed rank 3: 402,644; 4: 618,633; 5: 922,762).
+- Learned: copy-to-copy (seed) expansion recovers more than widening the S1 query: seed ranks 3-5 give 3x D10's gain.
+
+### 2026-09-27 · D10 · Distilled-e5 S1 query widened from top-5 to top-10 (S14 candidate) · ADOPTED (train gate)
+- Parent: S13-file, R1 · Metrics: `d10_eval.json`, `deep_probe.json` · Scripts: `plan/checks/d10_prep.py`,
+  `plan/checks/d10_eval.py`, `plan/checks/deep_probe.py`; HF d10-train-c0 (855,825 pairs) · Logs: `logs/d10_eval.log`,
+  `logs/deep_probe.log`. Test chain: `plan/checks/run_s14.sh` (log `logs/run_s14.log`).
+- Hypothesis: 29.6% of the true pairs missed by every channel belong to S1 with > 5 true pool records (`admit_sweep.json`);
+  a top-5 S1 query cannot return them all. Oracle (accept only the new true pairs) for distilled S1@10 +0.00045, @20
+  +0.00063, @50 +0.00087 (`deep_probe.json`).
+- Result: distilled ranks 6-10: 863,099 scored pairs (1,244 true); at c0 >= 0.995, 987 pass (928 true, precision 0.94).
+  S13-equivalent 0.98846 -> +0.00010 [+0.00008, +0.00012] (US +0.00004, India +0.00019, singleton +0.00000); candidates
+  3.87 -> 8.65 new per S1. Adaptive depth (only S1 with >= n S13 acceptances) is strictly worse: n=2 +0.00007, n=3 +0.00006,
+  n=5 +0.00004.
+- Learned: c0 realises 22% of the S1@10 oracle. @20 would cost ~24M test pairs to score (~110 min on one A100): out of budget.
+- Next: S14 = S13 + distilled ranks 6-10 on test. Expected LB (d, using the S12/S13 2.1-2.3x transfer): +0.0002, i.e. ~0.9838.
+
+### 2026-09-27 · N11 · Retrieval-side research sweep: reverse / iterative / name-only retrieval, c0 admission boundary · INFO
+- Metrics: `admit_sweep.json`, `rev_name_probe.json`, `deep_probe.json` · Scripts: `plan/checks/admit_sweep.py`,
+  `plan/checks/rev_name_probe.py`, `plan/checks/iter_eval.py` (I1, `logs/iter_eval.log`; stopped before writing its JSON,
+  numbers below are from the log only).
+- c0 admission (DRACE T sweep 0.9-0.999 on the S13 config): flat. Best in-sample T 0.99 +0.00002; cross-fitted (T chosen
+  per S1 half) vs 0.995 −0.00001. DROPPED.
+- Name-only (empty pool address) pairs: 64% of the 8,755 true pairs missed by every channel. c0 cannot confirm them: of
+  85,306 name-only DRACE pairs (485 true, AUC 0.971), only 2 true have p >= 0.9 (9 false). So more name-only recall
+  (name-only dense retrieval, reverse pool->S1 name retrieval) cannot pass the admission gate. Reverse-name top-20 covers
+  2,372 of 5,594 missed name-only records; the true S1 is rank 1 for 175. DROPPED (retrieval); the bottleneck is scoring
+  evidence for name-only pairs, same conclusion as N10.
+- Iterative retrieval (I1, profile vector = S1 + mean of accepted records, and hop-2 from DRACE records, distilled e5):
+  oracle at top-5 +0.00030 at 0.62 new cand/S1; top-2 +0.00010. Below the plain deeper S1 query (D10 oracle +0.00045).
+  DROPPED.
+
+### 2026-09-27 · O1 · c0 p_ce override / veto / logit blend on in-list pairs (+ per-source cap, D10 cost gates), MATCH_TRAIN · DROPPED (flat)
+- Metrics: `c0_override.json` · Script: `plan/checks/c0_override.py` · Logs: `logs/c0_override.log`; ad-hoc probes (no
+  metrics file, log only) `logs/probe_struct.log`, `logs/d10_cosgate.log`.
+- Setup: S13-equivalent base as admit_sweep (M027 OOF, threshold 0.73 + one-owner, then DRACE at c0 >= 0.995): 0.98846.
+  Rules: accept rejected pairs with p_ce >= A and p_cal >= B; zero accepted pairs with p_ce <= V and p_cal < C; logit
+  blend (1-w)·logit(p_cal) + w·logit(p_ce) with threshold sweep. Rule chosen on one S1 half, scored on the other.
+- Result: best in-sample +0.00001 [−0.00004, +0.00005]; cross-fitted −0.00001. Only 35 rejected pairs have p_ce >= 0.99
+  (57% true); no accepted pair has p_ce <= 0.01. LightGBM already absorbs c0 on in-list pairs.
+- Per-source structure: true copies per S1 range 0-5 in S2 and 0-6 in S3, widely spread; no pool record has two true S1.
+  No count cap to exploit.
+- D10 cost gates (855,825 D10 train pairs, 434 true): distilled cosine does not separate (keep 95% of true → keep 94.5% of
+  pairs). Rank does: ranks 6-7 hold 265 true (61%) in 330,215 pairs (38%).
+- Learned: stage-3 decision rules are exhausted (threshold, expected-F, twin rescue, empty-address threshold, veto, blend,
+  c0 override all flat). Remaining gains are on the retrieval side.
+- Next: if D10 test scoring cost or time is the constraint, score S1 ranks 6-7 only.
+
+### 2026-09-27 · I1 · Iterative retrieval: profile query and hop-2 recursion (distilled e5), MATCH_TRAIN · PARKED (weak)
+- Metrics: `iter_eval.json` · Scripts: `plan/checks/iter_prep.py`, `ce/hf_job/iter_job.py` (HF a100, 14 min), `plan/checks/iter_eval.py`
+  · Log: `logs/iter_eval.log`. Refs: Whang et al. SIGMOD 2009 (iterative blocking); ANCE-PRF (CIKM 2021) and Li et al.
+  TOIS 2023 (dense pseudo-relevance feedback).
+- Setup: S13-equivalent on 180K MATCH_TRAIN S1 (M027 + DRACE channels at c0 >= 0.995; F0.5 0.98846; accepted set built
+  from model decisions only). Profile query = normalize(e5(S1) + mean e5(accepted records)), 169,505 S1; hop-2 = the
+  5,621 DRACE-added records query their neighbours. A pair counts as new only if no current channel retrieves it
+  (stage-2 lists, untrained S1@5, seed@2, distilled S1@5). 8,755 true pairs are missed by every channel (64% name-only,
+  49% India).
+- Result (new pairs per S1, true rate, missed pairs recovered, oracle F0.5): profile top-5 0.56, 0.81%, 814 (9.3%),
+  +0.00030; profile top-10 4.33, 0.19%, 1,504 (17.2%), +0.00049; hop-2 top-10 0.19, 0.85%, 297 (3.4%), +0.00009;
+  both top-5 0.62, 0.82%, 914, +0.00032. Recovered pairs are 75% India; name-only recovered 35 of ~5,600 at top-5.
+- Learned: confirmed records add little new retrieval evidence beyond the S1 + copy channels. The hypothesis that a
+  profile reaches name-only copies fails (a name-only record has no more in common with the profile than with the S1);
+  the small gain is India transliteration, overlapping the distilled retriever. Hop-2 recursion has almost nothing to
+  start from (DRACE adds 0.03 records per S1). Ceiling at a reasonable candidate cost (+0.6 per S1) ≈ +0.0003 internal
+  before precision losses.
+- Next: not run on test with the remaining ~$1.4 unless a cheap c0 precision check (~$0.1) shows most of the oracle survives.
 
 ### 2026-09-27 · S13-LB · Submission 13 leaderboard: distilled-e5 S1 query top-5 0.983604 · ADOPTED
 - Log: `reports/test_usage_log.md` · Metrics: `drace_test_s13.json`, `gate2_union.json` · File:
