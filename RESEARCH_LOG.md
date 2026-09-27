@@ -45,7 +45,7 @@ Negative, flat, and failed runs are logged too — they are the part people forg
 | 3 matcher | MATCH_ALL held-out 165K | entity F0.5 | 0.98360 (full_comp; full_single 0.98161 same S1) | M005-full | `match_train_full_comp.json` |
 | 3 matcher | MATCH_ALL − DEV_REST_180K held-out 147K | entity F0.5 | 0.98537 (full_ce, + p_ce; full_single 0.98162 same S1) | S6-file | `match_train_full_ce.json` |
 | 3 matcher | MATCH_ALL − DEV_REST_180K held-out 147K | entity F0.5 | 0.98551 (full_ce_nf, + nfreq) | S7-file | `match_train_full_ce_nf.json` |
-| submission | test (public LB) | entity F0.5 | **0.984028 (S17)**; S16 0.983958; S14 0.983741; S13 0.983604; S12 0.983064; S11 0.981623; S10 0.98135; S7 0.976205; S6 0.976128; S2 0.966797; S1 0.966109; S3 0.966 (rounded) | S10-LB | `drace_test.json`, `reports/test_usage_log.md` |
+| submission | test (public LB) | entity F0.5 | **0.984075 (S18)**; S17 0.984028; S16 0.983958; S14 0.983741; S13 0.983604; S12 0.983064; S11 0.981623; S10 0.98135; S7 0.976205; S6 0.976128; S2 0.966797; S1 0.966109; S3 0.966 (rounded) | S10-LB | `drace_test.json`, `reports/test_usage_log.md` |
 
 ## Open questions
 
@@ -57,6 +57,21 @@ Negative, flat, and failed runs are logged too — they are the part people forg
 ---
 
 ## Log
+
+### 2026-09-27 · S18-LB · Submission 18 leaderboard: S17 + distilled S1 ranks 8-10, 0.984075 · ADOPTED
+- Log: `reports/test_usage_log.md` · Metrics: `drace_test_s18.json` · Chain: `plan/checks/run_s18.sh` (log `logs/run_s18.log`)
+  · File: `submission/output_v18/matching_results.tsv` (sha1 7334635c…).
+- Test: 1,347,669 new pairs (ranks 8-10) scored on h200 (2.9 min); DRACE additions 84,402 (S17 83,104); final 5,812,655.
+- Result: public LB 0.984075 vs S17 0.984028: +0.00005. Train evidence +0.00001 (seed5_eval.json, seed5+d10 vs seed5+d10_r67);
+  transfer ≈ 5x on a tiny base — distilled-retriever depth keeps transferring above train size.
+- Ops: two failed launches first (retrieve_job needs ann_search.py and pandas in the job image; fixed). The CPU-tokenisation
+  prefetch did not change embedding speed (19K records/s on h200 both ways).
+- Test-side diagnostic (`logs/country_shift_s17.log`): France predicted 3.243 pairs/S1 vs India 3.365, US 3.385 (train truth
+  3.46/S1), France candidate lists 9.05 vs 5.6. Possible France recall gap; not measurable without France labels.
+
+### 2026-09-27 · OW1 · DRACE ownership: fewest-matches-first instead of highest c0 · DROPPED (nothing to decide)
+- Metrics: `owner_rule.json` · Script: `plan/checks/owner_rule.py` · Log: `logs/owner_rule.log`.
+- S17-equivalent on train: 6,870 DRACE pairs; only 5 pool records claimed by > 1 S1. fewest-first −0.00001, most-first −0.00000.
 
 ### 2026-09-27 · S17-LB · Submission 17 leaderboard: S16 + distilled S1 ranks 6-7, 0.984028 (rank 663) · ADOPTED
 - Log: `reports/test_usage_log.md` · File: `submission/output_v17/matching_results.tsv` (sha1 3adb3960…).
