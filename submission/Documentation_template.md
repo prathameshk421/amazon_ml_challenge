@@ -20,7 +20,8 @@ We link each Source-1 (S1) record to its copies in the S2 + S3 pool in four step
 4. **A second retrieval channel (DRACE):** dense retrieval with multilingual-e5-small, plus "copy expansion" from pool
    records we already matched. The cross-encoder accepts only pairs it scores ≥ 0.995.
 
-On held-out train S1, DRACE adds +0.0025 F0.5. Public leaderboard: 0.96611 → **0.98135** (S10).
+On held-out train S1, DRACE adds +0.0025 F0.5. Public leaderboard: 0.96611 (first submission) → 0.98135 (S10,
+DRACE) → 0.98306 (S12, ownership features + fine-tuned retriever) → **0.98360** (S13, deeper fine-tuned retrieval).
 
 ---
 
@@ -206,7 +207,9 @@ Two feature groups address it:
 | S6 | + cross-encoder score (epoch 1) | 0.98438 | 0.97613 |
 | S7 | + name frequency | — | 0.97621 |
 | **S10** | c0 (epoch 2) + DRACE | 0.98802 (M027 + DRACE, 180K) | **0.98135** |
-| S11 | + reverse name retrieval + name frequency | +0.00037 over the S10 matcher | pending |
+| S11 | + reverse name retrieval + name frequency | +0.00037 over the S10 matcher | 0.98162 |
+| S12 | + group profile + distilled-e5 S1 query in DRACE (top-2) | 0.98643 (matcher, calibration slice) | 0.98306 |
+| **S13** | distilled-e5 S1 query widened to top-5 (7.73 candidates per S1) | +0.00026 over S12 (train) | **0.98360** |
 
 Paired gains on 180K MATCH_TRAIN S1 (5-fold, 95% CI, from `artifacts/metrics/`):
 

@@ -24,6 +24,7 @@ SEED_BASE = 10 ** 9
 BASE_OUT = Path("work/outputs/full_c0/matching_results.tsv")
 BASE_CAND = Path("submission/output_v9/candidate_pairs.tsv")
 OUT = Path("submission/output_v10")
+SKIP_EXTRA = []  # extra scored sets whose pairs pairs_extra must not rescore (e.g. DRACD_TEST)
 
 
 def key(a, b):
@@ -123,7 +124,8 @@ def pairs_extra(topk_tag, set_name, k1):
     top = pq.read_table(R / f"{topk_tag}_topk.parquet").to_pandas()
     m = top[(top.qid < SEED_BASE) & (top["rank"] <= k1)].rename(columns={"qid": "s1_idx"})[["s1_idx", "pool_idx", "cos"]]
     cand = test_candidates()
-    old = pd.read_parquet(R / "drace_test_meta.parquet")
+    old = pd.concat([pd.read_parquet(R / f)[["s1_idx", "pool_idx"]] for f in ["drace_test_meta.parquet"] +
+                     [f"{x.lower()}_meta.parquet" for x in SKIP_EXTRA]])
     base, _ = read_results(BASE_OUT)
     k = lambda a, b: key(a, b)
     m = m[~np.isin(k(m.s1_idx, m.pool_idx), k(cand.s1_idx, cand.pool_idx))]
@@ -184,6 +186,7 @@ if __name__ == "__main__":
     ap.add_argument("step", choices=["prep", "pairs", "merge", "pairs_extra"])
     ap.add_argument("--topk-tag", default="dracd_test")
     ap.add_argument("--set", default="DRACD_TEST")
+    ap.add_argument("--skip", default="", help="comma list of already scored extra sets to exclude in pairs_extra")
     ap.add_argument("--extra", default="", help="comma list of extra scored sets to merge (e.g. DRACD_TEST)")
     ap.add_argument("--k1", type=int, default=5)
     ap.add_argument("--k2", type=int, default=2)
@@ -192,5 +195,6 @@ if __name__ == "__main__":
     ap.add_argument("--out", default=str(OUT))
     ap.add_argument("--tag", default="drace_test")
     a = ap.parse_args()
+    SKIP_EXTRA[:] = [x for x in a.skip.split(",") if x]
     {"prep": prep, "pairs": lambda: pairs(a.k1, a.k2), "merge": lambda: merge(a.t, Path(a.base), Path(a.out), a.tag, [x for x in a.extra.split(",") if x]),
      "pairs_extra": lambda: pairs_extra(a.topk_tag, a.set, a.k1)}[a.step]()

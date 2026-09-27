@@ -52,6 +52,7 @@ verified on the model card via huggingface_hub at download time and logged here.
 | peft | 0.21.0 | Apache-2.0 | load + merge the LoRA adapter (ce/inference.py, ce/hf_job/score_job.py) |
 | accelerate | 1.15.0 | Apache-2.0 | installed as a peft dependency (project venv) |
 | intfloat/multilingual-e5-small | rev 614241f622f53c4eeff9890bdc4f31cfecc418b3, 118M params | MIT (model card) | DRACE dense retrieval in submission 10 (ce/hf_job/retrieve_job.py, no fine-tuning); reverse-name retrieval (plan/checks/rev_prep.py) |
+| e5_distil (our fine-tune of intfloat/multilingual-e5-small) | 118M params, HF dataset repo prathameshk421/ber-ce-scoring/e5_distil | derivative of MIT weights | distilled from our c0 cross-encoder on DEV_REST_REST fold-1 train pairs (ce/hf_job/distill_job.py); DRACE S1 query in submissions 12-13 |
 | HF Jobs a100-large, image pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime | 2026-09-27 | HF Jobs pay-as-you-go terms; torch BSD-3 | GPU runtime for p_ce scoring (no hosted model API; our code and weights only) |
 | Qwen/Qwen3-Reranker-0.6B | rev e61197ed45024b0ed8a2d74b80b4d909f1255473, 0.6B params | Apache-2.0 (hub card_data) | LoRA head-to-head vs ce_rec (ce/train_qwen.py, Kaggle kernel ber-ce-qwen-v2m3); not in any submission yet |
 | Kaggle GPU kernel image (2×T4) | 2026-09-27 | Kaggle terms; torch BSD-3 | runtime for ce/train_qwen.py and ce/train_continue.py |

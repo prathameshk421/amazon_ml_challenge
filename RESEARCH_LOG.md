@@ -45,7 +45,7 @@ Negative, flat, and failed runs are logged too — they are the part people forg
 | 3 matcher | MATCH_ALL held-out 165K | entity F0.5 | 0.98360 (full_comp; full_single 0.98161 same S1) | M005-full | `match_train_full_comp.json` |
 | 3 matcher | MATCH_ALL − DEV_REST_180K held-out 147K | entity F0.5 | 0.98537 (full_ce, + p_ce; full_single 0.98162 same S1) | S6-file | `match_train_full_ce.json` |
 | 3 matcher | MATCH_ALL − DEV_REST_180K held-out 147K | entity F0.5 | 0.98551 (full_ce_nf, + nfreq) | S7-file | `match_train_full_ce_nf.json` |
-| submission | test (public LB) | entity F0.5 | **0.98135 (S10, S9 + DRACE)**; S7 0.976205; S6 0.976128; S2 0.966797; S1 0.966109; S3 0.966 (rounded) | S10-LB | `drace_test.json`, `reports/test_usage_log.md` |
+| submission | test (public LB) | entity F0.5 | **0.983604 (S13)**; S12 0.983064; S11 0.981623; S10 0.98135; S7 0.976205; S6 0.976128; S2 0.966797; S1 0.966109; S3 0.966 (rounded) | S10-LB | `drace_test.json`, `reports/test_usage_log.md` |
 
 ## Open questions
 
@@ -57,6 +57,49 @@ Negative, flat, and failed runs are logged too — they are the part people forg
 ---
 
 ## Log
+
+### 2026-09-27 · S13-LB · Submission 13 leaderboard: distilled-e5 S1 query top-5 0.983604 · ADOPTED
+- Log: `reports/test_usage_log.md` · Metrics: `drace_test_s13.json`, `gate2_union.json` · File:
+  `submission/output_v13/matching_results.tsv` (sha1 e18433d2…).
+- Result: public LB 0.983604 vs S12 0.983064: +0.00054. Train evidence for the change: +0.00026 (variant C vs B);
+  transfer ≈ 2.1x, the same pattern as S12 (retrieval-side gains, mostly India, exceed their train size on test).
+  Cost: candidates 7.22 -> 7.73 per S1.
+- Learned: the distilled retriever keeps paying as its depth grows; retrieval is still the lever that transfers best.
+
+### 2026-09-27 · S13-file · S12 with the distilled-e5 S1 query widened to top-5 (R1 variant C) · INFO (upload candidate)
+- Parent: S12-file · Metrics: `drace_test_s13.json` · Chain: `plan/checks/run_s13.sh` (log `logs/run_s13.log`) · HF:
+  dracd5-test retrieval (distilled e5, test S1 top-5) + dracd5-test-c0 scoring (892,479 new pairs, 4.0 min).
+- Same matcher and base as S12 (full_c0_rgrp). New S1@3-5 pairs: 892,479 (0.515 per S1); 15,898 at c0 >= 0.995
+  (India 13,052, US 1,539, France 1,307). DRACE additions 74,017 (S12 58,315); final 5,823,229 pairs; candidates 7.73
+  per S1 (S12 7.22). Predicted pairs per S1 vs S12: India +0.016, US +0.002, France +0.005. Validator PASS; sha1 e18433d2….
+- Train evidence: variant C vs B +0.00026 (gate2_union.json: C +0.00075, B +0.00049 over current DRACE).
+
+### 2026-09-27 · S12-LB · Submission 12 leaderboard: S11 + group profile + distilled-e5 DRACE S1@2 0.983064 · ADOPTED
+- Log: `reports/test_usage_log.md` · File: `submission/output_v12/matching_results.tsv` (sha1 5952d600…).
+- Result: public LB 0.983064 vs S11 0.981623: +0.00144. Internal expectation ≈ +0.0006 (matcher +0.00013 on the
+  calibration slice, R1 variant B +0.00049 on train). Transfer ≈ 2.3x — the distilled-retrieval additions are 92% India
+  on test (7,887 of 8,545), and test has more India S1 (47% vs 40% of train); retrieval-side gains keep transferring
+  above their internal size (S10 too).
+- Next: S13 = distilled S1 query widened to top-5 (R1 variant C, +0.00075 vs +0.00049 on train, +1.8 cand/S1 on train).
+
+### 2026-09-27 · S11-LB · Submission 11 leaderboard: S10 + reverse-name ownership + nfreq 0.981623 · ADOPTED
+- Log: `reports/test_usage_log.md` · File: `submission/output_v11/matching_results.tsv` (sha1 49ac8e49…).
+- Result: public LB 0.981623 vs S10 0.98135: +0.00027. Internal: calibration slice +0.0003 over S9, 180K OOF +0.00037
+  (M035). Transfer ≈ 0.75-0.9x; the train-vs-test shift of the reverse features (nearest-name rate 24% vs 18%) did
+  not hurt.
+- Next: upload S12 (adds group profile + distilled-e5 S1@2 retrieval).
+
+### 2026-09-27 · S12-file · full_c0 + rev + nfreq + group profile (grp_full), DRACE + distilled-e5 S1@2 · INFO (upload candidate)
+- Parent: S11-file, M036, R1 · Metrics: `match_train_full_c0_rgrp.json`, `exp_predict_TEST_full_c0_rgrp.json`,
+  `drace_test_s12.json`, `firstpass_oof.json` · Chains: `plan/checks/run_s12_mac.sh`, `plan/checks/run_s12_hf.sh`,
+  merge `logs/merge_s12.log` · HF: dracd-test retrieval (distilled e5, test S1 top-2) + dracd-test-c0 scoring.
+- Group features for training rows come from a 5-fold first pass over all 4,544,045 training rows (folds 989-1,156 of
+  12,000, none truncated); TEST group features from S9's predictions.
+- Matcher: best_iteration 1190/12000 (converged). Calibration slice (same 83,523 S1 as S9/S11): 0.98643, +0.00477
+  [0.00442, 0.00511] over full_single (S11 +0.00464, S9 +0.00434). Decision threshold 0.70 + one-owner.
+- Test: distilled S1@2 retrieval gave 160,492 new pairs (0.093 per S1); 8,545 at c0 >= 0.995 (India 7,887, France 329,
+  US 329). DRACE additions 58,315 (S11 49,844); final 5,807,527 pairs; candidates 7.22 per S1. Predicted pairs per S1 vs
+  S11: India +0.011, US −0.005, France −0.001. Official validator --check-ids PASS; sha1 5952d600….
 
 ### 2026-09-27 · R1 · c0 distilled into multilingual-e5-small for DRACE retrieval (research pack Doc 2 #1) · ADOPTED (variant B)
 - Metrics: `gate1_gate1_distil.json`, `gate2_union.json` · Scripts: `plan/checks/distill_e5.py --dump`, `ce/hf_job/distill_job.py`

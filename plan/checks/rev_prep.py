@@ -17,6 +17,7 @@ Features (NaN unless the candidate's pool address is empty):
   rv_margin rv_cos - best other S1 cos (NaN when absent)
   rv_nclose S1 names within 0.02 of rv_top (how many owners look equally plausible)
 """
+import os
 import sys
 from pathlib import Path
 
@@ -27,7 +28,7 @@ import pyarrow.parquet as pq
 
 from ber import io_utils, match
 
-R = Path("work/retrieval")
+R = Path(os.environ.get("REV_DIR", "work/retrieval"))  # REV_DIR: alternative topk in / features out (ann_rev_check.py)
 SETS = {"train": ["MATCH_TRAIN", "MATCH_VALID", "DEV_REST_REST"], "test": ["TEST"]}
 
 
