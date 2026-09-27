@@ -45,10 +45,11 @@ Negative, flat, and failed runs are logged too — they are the part people forg
 | 3 matcher | MATCH_ALL held-out 165K | entity F0.5 | 0.98360 (full_comp; full_single 0.98161 same S1) | M005-full | `match_train_full_comp.json` |
 | 3 matcher | MATCH_ALL − DEV_REST_180K held-out 147K | entity F0.5 | 0.98537 (full_ce, + p_ce; full_single 0.98162 same S1) | S6-file | `match_train_full_ce.json` |
 | 3 matcher | MATCH_ALL − DEV_REST_180K held-out 147K | entity F0.5 | 0.98551 (full_ce_nf, + nfreq) | S7-file | `match_train_full_ce_nf.json` |
-| submission | test (public LB) | entity F0.5 | **0.976205 (S7, full_ce_nf)**; S6 0.976128; S2 0.966797; S1 0.966109; S3 0.966 (rounded) | S7-LB | `match_train_full_ce_nf.json`, `reports/test_usage_log.md` |
+| submission | test (public LB) | entity F0.5 | **0.98135 (S10, S9 + DRACE)**; S7 0.976205; S6 0.976128; S2 0.966797; S1 0.966109; S3 0.966 (rounded) | S10-LB | `drace_test.json`, `reports/test_usage_log.md` |
 
 ## Open questions
 
+- **Target (set 2026-09-27 12:55): public LB 0.98**, i.e. +0.0038 over S7 (0.976205). Two uploads left. Plan: slot 1 = S9 (c0, LightGBM on ~837K S1) if its calibration-slice gain over full_single ≥ ~+0.0045; slot 2 = S10 (c0 + c1 cross-fit, LightGBM on ~1.47M S1, + nfreq). Estimated S9 ≈ +0.001 on the LB (d); 0.98 is above every estimate so far.
 - Internal→leaderboard gap −0.0092 (S6; was −0.0148 at S2). N03/N04 explain ~0.008 from list statistics; ~0.006 is not visible without labels. Plan: `plan/RCA_RESEARCH_PLAN.md`.
 - Paired SE of a feature change at 180K. Unmeasured until the first M run (N01 only covers one-owner).
 - How much the OOF score is inflated by `translit_dict` being mined from DICT_SRC labels (VALIDATION_PLAN P4). Unmeasured.
@@ -56,6 +57,185 @@ Negative, flat, and failed runs are logged too — they are the part people forg
 ---
 
 ## Log
+
+### 2026-09-27 · R1 · c0 distilled into multilingual-e5-small for DRACE retrieval (research pack Doc 2 #1) · ADOPTED (variant B)
+- Metrics: `gate1_gate1_distil.json`, `gate2_union.json` · Scripts: `plan/checks/distill_e5.py --dump`, `ce/hf_job/distill_job.py`
+  (HF a100, 6.8 min training + gate-1 retrieval), `plan/checks/gate2_prep.py --tag gate1_distil`, `plan/checks/gate2_union.py`
+  · Model: HF repo `prathameshk421/ber-ce-scoring/e5_distil/` (+ train_meta.json) · Logs: `logs/gate1_distil_eval.log`,
+  `logs/gate2_union.log`.
+- Training: 150K DEV_REST_REST fold-1 S1 (disjoint from MATCH_TRAIN), 435,454 triplets (S1, true pool record incl. 12,666
+  blocking misses, hardest false in-list candidate by c0); loss InfoNCE (t 0.05, in-batch) + MarginMSE on the c0 p margin;
+  1 epoch, batch 128, lr 2e-5. MarginMSE 0.85 -> 0.26.
+- Gate 1 (MATCH_TRAIN vs full train pool): S1@5 recall of blocking-missed true pairs 21.7% -> 35.5% (India 24.4% -> 47.7%,
+  US 17.7% -> 17.7%) at 1.29 -> 2.12 new candidates per S1; seed expansion worse for US (34.5% -> 26.9%).
+- Gate 2 (base M027, c0 >= 0.995, one-owner): A = current DRACE +0.00220 vs M027 (1.81 new cand/S1). B = A + distilled
+  S1@2: +0.00049 [0.00040, 0.00058] vs A at 2.08 cand/S1 (India +0.00120, US +0.00001, singleton −0.00069). C = A +
+  distilled S1@5: +0.00075 [0.00065, 0.00085] at 3.87 cand/S1. c0 AUC on the distilled S1 pairs 0.99987.
+- Decision: B (most gain per extra candidate). Next: test-side distilled S1 retrieval (K=2) + c0 scoring, merged into S12.
+
+### 2026-09-27 · V1 · Hard address-number vetoes (research pack Doc 1 #4) on M035 OOF · DROPPED
+- Log: `logs/veto_probe.log`. Accepted pairs hit by a veto are almost all true: digit conflict 27,669 pairs precision 0.993
+  (Δ −0.02086); house-number mismatch 87,696, 0.996 (−0.07835); long-number mismatch 65,674, 0.993 (−0.04372); digit
+  conflict & name >= 0.95 20,823, 0.994 (−0.01419).
+- Learned: the generator corrupts numbers on true copies (e.g. 4900 vs 490), so number conflict is weak evidence; LightGBM
+  already weighs it. Also noted: greedy one-owner is already the optimal assignment (no S1 capacity limit), so the
+  research pack's Hungarian / optimal-transport step has nothing to gain.
+
+### 2026-09-27 · S11-file · full_c0 + reverse-name ownership (rev) + nfreq, then DRACE · INFO (upload candidate)
+- Parent: S9-file, M031, M034, M035 · Metrics: `match_train_full_c0_rev.json`, `exp_predict_TEST_full_c0_rev.json`,
+  `drace_test_s11.json` · Chain: `plan/checks/run_submission_s11.sh` (log `logs/run_submission_s11.log`) · Density check:
+  `logs/s11_density_check.log`.
+- Change: same training rows / seeded split as full_c0 (REST_FOLD=1, DEV_REST_180K excluded) + groups `rev`, `nfreq`;
+  DRACE merge unchanged (S1@5 + seed@2 pairs from S10, c0 >= 0.995, pool records owned by the new base excluded).
+- Result: calibration slice (same 83,523 S1 as S9): +0.00464 [0.00429, 0.00499] over full_single vs S9's +0.00434
+  (≈ +0.0003 over S9 on identical S1). Test: 5,752,290 base pairs (S9 5,739,077) + 49,844 DRACE = 5,802,134; 7.13
+  candidates per S1. Official validator --check-ids PASS; sha1 in the chain log.
+- Shift check: extra name-only accepted pairs per S1 +0.0032 on train (their precision 0.967 -> 0.971) vs +0.0044 on
+  test (1.4x). Worst case if all extra test acceptances were wrong ≈ −0.0003.
+- Supporting runs: M031 rev +0.00028 [0.00016, 0.00039] (band +0.00099); M034 nfreq +0.00020 [0.00009, 0.00031];
+  M035 both +0.00037 vs M027; M033 specialists +0.00021 (parked: needs full-scale 5-fold specialists).
+
+### 2026-09-27 · D1 · DRACE-specific LightGBM scorer vs fixed c0 >= 0.995 (Phase 8), MATCH_TRAIN · DROPPED (flat)
+- Metrics: `drace_calib.json` · Script: `plan/checks/drace_calib.py` · Log: `logs/drace_calib.log`.
+- Change: on the pairs test used (S1 rank <= 5 or seed rank <= 2; 309,681 pairs, 5,050 true), LightGBM on c0 p/logit,
+  cosines, ranks, source flags, number of seed paths, best seed p_cal, name/address token-set, empty address; trained on
+  one S1 half, scored on the other, threshold chosen on the scoring model's own half.
+- Result: AUC c0 0.99962, model 0.99951. Rule vs M027 +0.00220; model vs M027 +0.00219; model vs rule −0.00001
+  [−0.00004, 0.00002].
+- Learned: retrieval provenance adds nothing over c0 on DRACE pairs; keep the fixed threshold.
+
+### 2026-09-27 · M032 · X3 sibling group retested on the c0 base · PARKED (small)
+- Parent: M027 · Metrics: `exp_M032.json` · Log: `logs/exp_M032.log` · Folds 410/359/562/250/257 of 3000.
+- Result: OOF 0.98563, Δ +0.00012 [0.00002, 0.00021]; band +0.00028 [−0.00008, 0.00063]; singleton −0.00098 [−0.00176,
+  −0.00010] (inside the −0.002 guard); US +0.00018, India +0.00002.
+- Learned: c0 absorbed most of X3's old +0.00074. Not worth computing sib at full scale for the last slot.
+
+### 2026-09-27 · N10 · S10 loss breakdown on train + two cheap probes (name-twin rescue, empty-address threshold) · INFO
+- Metrics: `loss_s10.json` · Scripts: `plan/checks/loss_s10.py`; probes in `logs/twin_probe.log`, `logs/seg_threshold_probe.log`.
+- S10-equivalent (M027 OOF + DRACE@0.995) on 180K MATCH_TRAIN S1: F0.5 0.98801. Oracle gain by bucket: FN_list (true pair
+  in list, LightGBM rejects) 9,878 pairs +0.00546 (77% empty pool address); FN_never (found by nothing incl. e5 top-50)
+  4,900 +0.00271 (73% empty); FP_lgb 1,395 +0.00192; FN_retr50 (e5 rank 6-50) 3,554 +0.00162; FN_drace (retrieved, c0 <
+  0.995) 1,216 +0.00049; FP_drace 87 +0.00011.
+- Name-twin rescue (accept a rejected candidate whose normalised name equals an accepted match's): precision 0.084, every
+  variant negative (−0.00031 to −0.04347); 0 empty-address candidates are exact twins (copies carry altered names). DROPPED.
+- Separate threshold for empty-address pairs: cross-fitted −0.00010 [−0.00016, −0.00003]. DROPPED.
+- Learned: the largest remaining loss is empty-address pairs the matcher cannot separate; decision-rule tweaks do not help,
+  only better evidence (cross-encoder quality on name-only records) or more retrieval can.
+
+### 2026-09-27 · S10-LB · Submission 10 leaderboard: S9 + DRACE 0.98135 · ADOPTED
+- Log: `reports/test_usage_log.md` · Metrics: `drace_test.json`, `gate2_c0.json`, `match_train_full_c0.json` ·
+  File: `submission/output_v10/matching_results.tsv` (sha1 d6eb3ab2…).
+- Result: public LB 0.98135 vs S7 0.976205: +0.00515. Internal expectation ~0.9885 (S9 slice 0.98600 + G2 +0.0025), so
+  the internal→LB gap shrank from −0.0093 (S7) to ~−0.0071. S9 alone was not uploaded, so the split of the +0.00515
+  between c0 (S9) and DRACE is not measured; DRACE's train gain alone (+0.0025) is about half.
+- Learned: recall-side changes (DRACE: dense retrieval + copy expansion + cross-encoder filter) transfer to test at least
+  as well as internal numbers predict; the 0.98 target is met.
+- Next: keep the last slot as a reserve; document the pipeline for the final review (candidate_pairs.tsv 7.13 per S1).
+
+### 2026-09-27 · S10-file · DRACE on TEST on top of S9 (S1@5 + seed@2, c0 >= 0.995) · INFO (upload candidate)
+- Parent: S9-file, G2 · Metrics: `drace_test.json` · Scripts: `plan/checks/drace_test.py`, `plan/checks/run_drace_test.sh`,
+  `plan/checks/run_drace_score_merge.sh` · HF Jobs: drace-test-retrieval (a100, 35.3 min), drace-test-c0-v2 (a100, 8.2 min);
+  first scoring attempt failed in 59 s (score_job required a label column; fixed). Logs: `logs/run_drace_test*.log`,
+  `logs/run_drace_score_merge.log`.
+- Retrieval: 9,969,589 test pool records, 7,471,621 queries (1,732,544 S1 + 5,739,077 S9 accepted pairs as seeds), per
+  country; 10,286,575 retrieved -> 1,735,134 new pairs (1.00 per S1) after removing in-list pairs and pool records S9
+  already assigns. c0 p_ce: median 6e-5, 99th percentile 0.99994 (bimodal).
+- Added at p_ce >= 0.995 with one-owner: 49,859 pairs (0.0288 per S1; train G2 at 0.995: 0.0307 per S1). By country:
+  India 36,408 (0.045 per S1), France 7,294 (0.028), US 6,157 (0.009) — same order as train (India gains most).
+  Final 5,788,936 pairs (S9 5,739,077); 101,305 empty S1; candidates 7.13 per S1 (S9 6.13).
+- File: `submission/output_v10/matching_results.tsv` (sha1 d6eb3ab2…), `candidate_pairs.tsv` includes every scored
+  DRACE pair; official validator --check-ids PASS.
+- Expectation (d): internal ~0.9885 (S9 slice 0.98600 + G2 +0.0025); LB ~0.979-0.981 with the historical −0.009 gap.
+
+### 2026-09-27 · TC · Transitive-consistency cleaning (TransClean-style) on M027 + DRACE, MATCH_TRAIN · DROPPED (flat)
+- Parent: G2 · Metrics: `tc_train.json` · Script: `plan/checks/tc_train.py` · HF Job tc-train-c0 (a100, 8.7 min scoring) ·
+  Log: `logs/tc_train.log`. Paper: TransClean, arXiv 2506.04006 (+24.42 F1 on their multi-source data, (b)).
+- Change: for S1 with >= 3 predicted pool records, c0 scores every ordered pool-pool pair among them (1,863,832);
+  sibling score = mean two-order p; drop a record when sibling score < tau and own score < cap; cross-fitted by S1 half.
+- Result: base 0.98801; 527,310 records with >= 2 siblings, only 0.25% FP. c0 pool-pool AUC 0.831 (vs 0.999 S1-pool);
+  sibling-score AUC true-vs-FP 0.892. Every rule drops more TP than FP (tau 0.3: 535 FP, 6,668 TP). Cross-fitted Δ
+  +0.00000 [−0.00002, 0.00003] (both halves chose tau 0.05, cap 0.9).
+- Learned: the base has too few FPs inside multi-match sets for consistency cleaning to pay, and c0 does not transfer
+  to pool-vs-pool comparison. Not applied to test (saved ~$2 of scoring).
+
+### 2026-09-27 · M030 · MLP-PLR (numeric periodic embeddings, tuned schedule) instead of / blended with LightGBM · DROPPED (flat)
+- Parent: M027 · Metrics: `exp_M030.json`, `exp_M030b.json` (w 0.5, fixed before the run), `exp_M030b25.json`,
+  `exp_M030b75.json` · Script: `plan/checks/nn_exp.py --run M030 --arch plr --lr 1e-3 --wd 1e-4 --batch 4096
+  --max-epochs 30 --patience 5 --cosine` (laptop MPS, 600 s) · Log: `logs/nn_exp_M030.log` · Models: `work/match/runs/M030/models/`.
+- Hypothesis: M029 was undertrained (lr 2e-3 fixed, patience 2, fold 3 stopped at epoch 4); PLR embeddings (Gorishniy
+  et al. 2022) close most of the MLP-vs-GBDT gap on tabular data, and a near-equal NN might help a blend.
+- Result: epochs 14-24 of 30 (none hit the cap); early-stop logloss 0.0277-0.0289 vs LightGBM 0.0261-0.0282. Alone 0.98528,
+  Δ −0.00023 [−0.00038, −0.00008]; blend 0.5 0.98559, Δ +0.00008 [−0.00002, 0.00018]; 0.25 +0.00005 [−0.00001,
+  0.00012]; 0.75 −0.00003 [−0.00016, 0.00009]. Correlation with LightGBM raw p 0.99887.
+- Learned: a properly trained NN nearly matches LightGBM but learns the same function from the same 69 features; blending
+  adds nothing measurable. Model family is not where the remaining loss is (third confirmation after XGB-BLEND, M029).
+
+### 2026-09-27 · M029 / M029b · MLP instead of / blended with LightGBM on M027's setup · DROPPED
+- Parent: M027 · Metrics: `exp_M029.json`, `exp_M029b.json` · Script: `plan/checks/nn_exp.py` (laptop MPS, 131 s) ·
+  Log: `logs/nn_exp_M029.log` · Models: `work/match/runs/M029/models/` (mlp_fold*.pt, prep_fold*.pkl).
+- Change: MLP 69 -> 256 -> 256 -> 128 -> 1 (SiLU, dropout 0.1, AdamW 2e-3, batch 2048), quantile-normal inputs + NaN
+  indicators fit per fold on fit rows; early stop on M027's early-stop S1 (patience 2). Same folds, isotonic, decision.
+- Result: MLP alone 0.98441, Δ −0.00111 [−0.00128, −0.00094]; 0.5/0.5 raw-probability blend 0.98533, Δ −0.00019
+  [−0.00031, −0.00007]. Early-stop logloss per fold 0.0291–0.0334 (fold 3 stopped at epoch 4). Correlation with
+  LightGBM raw p 0.99707.
+- Learned: on these engineered features the MLP is worse and too correlated with LightGBM to help a blend (same finding
+  as XGB-BLEND). No neural matcher in the submission.
+
+### 2026-09-27 · G2 · Gate 2: c0-filtered dense-retrieval pairs added to M027 (recall rescue), MATCH_TRAIN · ADOPTED (for the final submission)
+- Parent: M027, G1 · Metrics: `gate2_c0.json` · Scripts: `plan/checks/gate2_prep.py`, `plan/checks/gate2_eval.py`,
+  HF Job gate2-c0 (a100-large, 4.6 min scoring; MATCH_VALID AUC 0.99897) · Log: `logs/gate2_eval.log`.
+- Hypothesis: G1 recovers 44% of missed true pairs at S1@5 + seed@5 but at 0.7% positive rate; c0 (AUC 0.999 on list pairs)
+  may still separate them because retrieval look-alikes differ in ways a cross-encoder reads (numbers, addresses).
+- Change: add a new pair when p_ce(c0) >= t (and cos >= c); one-owner kept (pool records M027 already accepts are not
+  added; a pool record wanted by several S1 goes to the highest p_ce). Threshold cross-fitted: chosen on one hash half
+  of the S1, scored on the other, swapped. c0 never trained on a MATCH_TRAIN S1.
+- Result: 983,236 new pairs -> 928,868 after one-owner (6,662 true); c0 AUC on them 0.9996. Cross-fitted: F0.5 0.98552 ->
+  0.98802, paired Δ +0.00251 [0.00239, 0.00264], 5,031 S1 changed; both halves chose t 0.99, c 0. US +0.00105 [0.00096,
+  0.00115], India +0.00469 [0.00443, 0.00498], band +0.00253 [0.00232, 0.00274], singleton −0.00049 [−0.00098,
+  −0.00010] (inside the −0.002 guard). At t 0.99: 5,660 added, TP 5,542, FP 118 (97.9% precision). Plateau: every t from
+  0.9 to 0.998 gives +0.00235 to +0.00251; the cosine filter never helps. 81% of G1's +0.00309 oracle.
+- Learned: the largest single gain of the project so far, on the loss bucket (stage-1 misses) no earlier change touched.
+  The cross-encoder is precise enough on retrieval look-alikes that a plain threshold works; no LightGBM retrain needed
+  for this gain.
+- Caveat: test lists are denser (5.75 vs 4.68 pool records per S1) and France is unseen; FP rate on test may be higher.
+  The plateau allows a stricter test threshold (0.995: +0.00249 internal) at almost no internal cost.
+- Next: same pipeline on TEST on top of S9 (seeds = S9's accepted pool records), t 0.995.
+
+### 2026-09-27 · G1 · Gate 1: dense retrieval recall of missed true pairs (multilingual-e5-small, train side) · INFO (pass)
+- Metrics: `gate1_gate1.json` · Scripts: `plan/checks/gate1_prep.py`, `ce/hf_job/retrieve_job.py` (HF a100-large, 15.6 min,
+  ~$0.65), `plan/checks/gate1_eval.py` · Log: `logs/gate1_eval.log`.
+- Setup: 180,000 MATCH_TRAIN S1 + 597,934 seed queries (pool records M027 OOF accepts, threshold 0.73 + one-owner) against
+  all 10,320,219 train pool records, per country (US 6.19M, India 4.13M), exact cosine top-50. Text "query: name | addr".
+- Sanity: M027 F0.5 recomputed 0.98552 (= exp_M027.json); in-list true pairs retrieved by S1 query @50: 97.8%.
+- Result: 15,117 of 621,534 true pairs (2.43%) are missing from the final candidate lists. Recovered (new pairs per S1,
+  positive rate, oracle F0.5 gain if only the recovered true pairs were added to M027):
+  S1@5 21.7% (1.29, 1.4%, +0.00196); S1@10 37.2% (5.80, 0.5%, +0.00284); S1@50 54.0% (45.5, 0.1%, +0.00400);
+  seed@5 38.8% (4.77, 0.7%, +0.00220); S1@5+seed@5 44.1% (5.46, 0.7%, +0.00309); S1@10+seed@10 53.8% (19.2, 0.2%,
+  +0.00371); S1@20+seed@20 60.7% (47.8, 0.1%, +0.00420). India recall > US at every k.
+- Learned: recall passes the 25% bar; copy expansion finds as many missed pairs as the S1 query. The problem moves to
+  precision: at 5+5 only 1 new pair in ~140 is true, and F0.5 break-even is ~3.6 TP per FP (N09).
+- Next: gate 2 — c0 scores the S1@5+seed@5 new pairs (983K); pick a threshold on train labels; realistic F0.5 gain.
+
+### 2026-09-27 · S9-file · full_c0: 68 live features + ce_rec_c0 p_ce, MATCH_TRAIN + MATCH_VALID + DEV_REST_REST fold 1 · INFO (upload candidate)
+- Parent: M027 · Metrics: `match_train_full_c0.json`, `exp_predict_TEST_full_c0.json` · Chain:
+  `plan/checks/run_submission_c0_full.sh` (log `logs/run_submission_c0_full.log`; first attempt died with the session
+  while waiting, restarted 13:05) · Fold-1 scores: HF Job c0-score-f1-l4 (l4x1, 60.2 min, 984 pairs/s, AUC 0.99895).
+- Change: `REST_FOLD=1 EXCLUDE_SETS=DEV_REST_180K train_final_comp.py full_c0 cex_p:ce_rec_c0`; DEV_REST_REST fold 0 (c0's
+  training S1) and DEV_REST_180K (ce_rec's) dropped; same seeded split for every other S1.
+- Result: best_iteration 1202/12000 (converged), fit 3,864,095 rows. Calibration slice 83,523 S1: 0.98600 vs full_single
+  0.98166, paired Δ +0.00434 [0.00402, 0.00467], 3,200 S1 changed (full_ce +0.00375, full_ce_nf +0.00389 on their larger
+  slices — not the same S1). Decision: threshold 0.72 + one-owner.
+- Test: 5,739,077 pairs; 102,497 empty S1; mean predicted size France 3.22 / India 3.29 / US 3.38. File:
+  `submission/output_v9/matching_results.tsv` (sha1 cb77cd04…); official validator --check-ids PASS.
+- Learned: c0's gain mostly survives the smaller LightGBM training set (~+0.0004-0.0005 over S7 on this measure).
+- Next: upload as slot 1 (expected LB ~0.9766-0.9772, (d)).
+
+### 2026-09-27 · M028 · ce_rec and ce_rec_c0 scores as two columns · DROPPED (flat)
+- Parent: M027 · Metrics: `exp_M028.json` · Log: `logs/exp_M028.log` · Folds 402/400/462/309/319 of 3000 (none truncated).
+- Hypothesis: disagreement between the two cross-encoders marks uncertain pairs.
+- Result: OOF 0.98545 vs M027 0.98552, Δ −0.00007 [−0.00017, 0.00003], 1,168 S1 changed.
+- Learned: c0 is ce_rec continued, so the older score carries no extra information. A second CE feature needs a
+  model trained on different data or a different architecture to have a chance.
 
 ### 2026-09-27 · S8-file · M027 on TEST: 68 live features + ce_rec_c0 p_ce, MATCH_TRAIN 5-fold models · INFO (upload candidate)
 - Parent: M027 · Metrics: `exp_M027.json` (OOF 0.98552), `exp_predict_TEST_M027.json` · Chain:

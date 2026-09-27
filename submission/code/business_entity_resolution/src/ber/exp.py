@@ -293,7 +293,61 @@ def group_nfreq(set_name, X, s1, pool):
     return np.column_stack([cnt(c1, pkey), cnt(cp, pkey), cnt(c1, skey)])
 
 
+REV_COLS = ["rv_in20", "rv_rank", "rv_cos", "rv_top", "rv_gap", "rv_margin", "rv_nclose"]
+
+
+def group_rev(set_name, X, s1, pool):
+    """Reverse-name retrieval for name-only pool candidates (plan/checks/rev_prep.py): where this S1 ranks among all
+    same-country S1 names nearest to the pool record's name. Read from work/retrieval/rev_<SET>.parquet."""
+    t = pq.read_table(io_utils.paths()["work_root"] / "retrieval" / f"rev_{set_name}.parquet")
+    ts1, tpool = t.column("s1_idx").to_numpy(), t.column("pool_idx").to_numpy()
+    F = np.column_stack([t.column(c).to_numpy() for c in REV_COLS])
+    if ts1.size == s1.size and np.array_equal(ts1, s1) and np.array_equal(tpool, pool):
+        return F
+    # a row subset (e.g. REST_FOLD in train_final_comp.py): align by (s1_idx, pool_idx); every row must be found
+    key = s1.astype(np.int64) << 32 | pool.astype(np.int64)
+    tkey = ts1.astype(np.int64) << 32 | tpool.astype(np.int64)
+    order = np.argsort(tkey)
+    pos = np.searchsorted(tkey, key, sorter=order)
+    pos = np.minimum(pos, tkey.size - 1)
+    if not np.array_equal(tkey[order[pos]], key):
+        raise RuntimeError(f"rev_{set_name}.parquet does not cover the feature rows")
+    return F[order[pos]]
+
+
+GRP_COLS = ["g_n_acc", "g_name_max", "g_name_rmax", "g_tok_cov", "g_addr_max", "g_same_src"]
+
+
+def group_grp(set_name, X, s1, pool):
+    """Group-profile features vs the S1's first-pass accepted pool records (plan/checks/grp_feats.py)."""
+    return _aligned("grp", set_name, GRP_COLS, s1, pool)
+
+
+def _aligned(prefix, set_name, cols, s1, pool):
+    """Columns of work/retrieval/<prefix>_<SET>.parquet aligned to the feature rows by (s1_idx, pool_idx)."""
+    t = pq.read_table(io_utils.paths()["work_root"] / "retrieval" / f"{prefix}_{set_name}.parquet")
+    ts1, tpool = t.column("s1_idx").to_numpy(), t.column("pool_idx").to_numpy()
+    F = np.column_stack([t.column(c).to_numpy() for c in cols])
+    if ts1.size == s1.size and np.array_equal(ts1, s1) and np.array_equal(tpool, pool):
+        return F
+    key = s1.astype(np.int64) << 32 | pool.astype(np.int64)
+    tkey = ts1.astype(np.int64) << 32 | tpool.astype(np.int64)
+    order = np.argsort(tkey)
+    pos = np.minimum(np.searchsorted(tkey, key, sorter=order), tkey.size - 1)
+    if not np.array_equal(tkey[order[pos]], key):
+        raise RuntimeError(f"{prefix}_{set_name}.parquet does not cover the feature rows")
+    return F[order[pos]]
+
+
+def group_grp_full(set_name, X, s1, pool):
+    """grp built from full-scale first-pass OOF decisions (plan/checks/firstpass_oof.py); TEST from S9."""
+    return _aligned("grp_full", set_name, GRP_COLS, s1, pool)
+
+
 GROUPS = {
+    "grp": (GRP_COLS, group_grp),
+    "grp_full": (GRP_COLS, group_grp_full),
+    "rev": (REV_COLS, group_rev),
     "nfreq": (["nf_pool_name_in_s1", "nf_pool_name_in_pool", "nf_s1_name_in_s1"], group_nfreq),
     "num":(["nm_first_state", "nm_first_logdiff", "nm_any_digit_drop", "nm_post_state", "nm_unit_state",
              "nm_q_n", "nm_p_n", "nm_shared_same_order"], group_num),
@@ -481,7 +535,7 @@ def group_path(set_name, name):
 def load_group(set_name, name, X, s1, pool, lg=None):
     """Group columns for the feature rows (cached per set; the cache stores s1/pool to verify row order)."""
     cols, fn = group_spec(name)
-    if name.startswith(("ce:", "cex_")):
+    if name.startswith(("ce:", "cex_")) or name in ("rev", "grp", "grp_full"):
         return fn(set_name, X, s1, pool).astype(np.float32)
     path = group_path(set_name, name)
     if path.exists():

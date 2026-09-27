@@ -41,6 +41,9 @@ SEED = 20260926
 ES_FRAC, CAL_FRAC = 0.05, 0.10
 NUM_BOOST_ROUND = int(os.environ.get("NUM_BOOST_ROUND", "12000"))  # override only for smoke runs
 EXCLUDE = [s for s in os.environ.get("EXCLUDE_SETS", "").split(",") if s]
+# REST_FOLD=k keeps only DEV_REST_REST rows whose S1 is in cross-encoder fold k (ce/train_continue.py fold_of):
+# the fold-(1-k) adapter trained on the other half, so its p_ce is in-sample there.
+REST_FOLD = os.environ.get("REST_FOLD")
 
 
 def main():
@@ -66,6 +69,10 @@ def main():
         X, s1, pool, meta = match.load_features(name, fp)
         if meta["features"] != match.FEATURES or meta.get("limited"):
             raise RuntimeError(f"{name}: features stale or --limit build")
+        if name == "DEV_REST_REST" and REST_FOLD is not None:
+            k = ((s1.astype(np.uint64) * np.uint64(0x9E3779B1)) % np.uint64(2**32)) >> np.uint64(31) == int(REST_FOLD)
+            X, s1, pool = X[k], s1[k], pool[k]
+            print(f">>> DEV_REST_REST: fold {REST_FOLD} only, {np.unique(s1).size} S1", flush=True)
         G = np.hstack([exp.load_group(name, g, X, s1, pool) for g in GROUPS])
         Xs.append(np.hstack([X, G])[:, cols]); s1s.append(s1); pools.append(pool)
         print(f">>> {name}: {s1.size} rows with groups ({time.time()-t0:.0f}s)", flush=True)
@@ -79,7 +86,7 @@ def main():
     perm = rng.permutation(queries)
     n_cal, n_es = int(CAL_FRAC * queries.size), int(ES_FRAC * queries.size)
     q_cal, q_es = np.sort(perm[:n_cal]), np.sort(perm[n_cal:n_cal + n_es])
-    if EXCLUDE:
+    if EXCLUDE or REST_FOLD is not None:
         present = np.unique(s1)
         q_cal, q_es = q_cal[np.isin(q_cal, present, assume_unique=True)], q_es[np.isin(q_es, present, assume_unique=True)]
         queries = queries[np.isin(queries, present, assume_unique=True)]
@@ -144,7 +151,7 @@ def main():
     booster.save_model(str(rd / "model_fold0.txt"), num_iteration=best)
     doc = {"features": match.FEATURES, "extra_groups": GROUPS, "feature_names": names, "features_used": feats,
            "n_folds": 1, "n_seeds": 1, "bucketing_fingerprint": fp,
-           "run": RUN, "train_set": "MATCH_ALL" + (f" minus {EXCLUDE}" if EXCLUDE else ""), "train_limited": False, "calibration": calib, "decision": decision,
+           "run": RUN, "train_set": "MATCH_ALL" + (f" minus {EXCLUDE}" if EXCLUDE else "") + (f", DEV_REST_REST fold {REST_FOLD} only" if REST_FOLD is not None else ""), "train_limited": False, "calibration": calib, "decision": decision,
            "floor_threshold": floor_t, "oof_f05": f05, "oof_floor_f05": floor[floor_t],
            "holdout_note": "oof_f05 = F0.5 on a held-out 10% of MATCH_ALL S1 (calibration slice), not 5-fold OOF",
            "best_iteration": best, "num_boost_round": NUM_BOOST_ROUND, "truncated": bool(truncated),

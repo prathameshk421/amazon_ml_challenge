@@ -68,7 +68,8 @@ def auc(y, s):
 t_job = time.time()
 for set_name in SETS:
     src = root / f"pairs_{set_name}.parquet"
-    cols = ["s1_idx", "pool_idx", "text_a", "text_b"] + (["label"] if set_name != "TEST" else [])
+    has_label = "label" in pq.read_schema(src).names  # test-side sets carry no labels
+    cols = ["s1_idx", "pool_idx", "text_a", "text_b"] + (["label"] if has_label else [])
     table = pq.read_table(src, columns=cols)
     out_dir = Path("/tmp/scores") / set_name
     out_dir.mkdir(parents=True, exist_ok=True)

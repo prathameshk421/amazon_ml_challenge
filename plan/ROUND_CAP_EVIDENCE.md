@@ -50,6 +50,15 @@ is the fix — a measured table, and a mechanical check to run after every train
 | exp M012 main_part2 (180,000 S1) | 975,699 | ~702,500 | 3000 | 935, 1182, 1185, 1248, 1114 | No (`exp_M012.json`) |
 | exp M012 main_part3 (180,000 S1) | 975,699 | ~702,500 | 3000 | 1318, 1256, 1415, 1121, 1248 | No (`exp_M012.json`) |
 | exp M013 main (180,000 S1, band rows only) | 975,699 | ~702,500 | 3000 | 119, 116, 122, 135, 152 | No (`exp_M013.json`) |
+| exp M020 main (180,000 S1, CE-derived family) | 975,699 | ~702,500 | 3000 | 578, 573, 761, 566, 424 | No (`exp_M020.json`) |
+| exp M021 main (180,000 S1, CE-derived family) | 975,699 | ~702,500 | 3000 | 468, 613, 614, 566, 397 | No (`exp_M021.json`) |
+| exp M022 main (180,000 S1, CE-derived family) | 975,699 | ~702,500 | 3000 | 657, 518, 633, 717, 377 | No (`exp_M022.json`) |
+| exp M023 main (180,000 S1, CE-derived family) | 975,699 | ~702,500 | 3000 | 742, 576, 791, 438, 566 | No (`exp_M023.json`) |
+| exp M024 main (180,000 S1, CE-derived family) | 975,699 | ~702,500 | 3000 | 587, 511, 554, 477, 447 | No (`exp_M024.json`) |
+| exp M025 main (180,000 S1, CE-derived family) | 975,699 | ~702,500 | 3000 | 464, 527, 566, 420, 387 | No (`exp_M025.json`) |
+| exp M026 main (180,000 S1, CE-derived family) | 975,699 | ~702,500 | 3000 | 545, 716, 561, 490, 427 | No (`exp_M026.json`) |
+| exp M027 main (180,000 S1, cex_p ce_rec_c0) | 975,699 | ~702,500 | 3000 | 422, 383, 454, 394, 370 | No (`exp_M027.json`) |
+| exp M028 main (180,000 S1, ce_rec + ce_rec_c0) | 975,699 | ~702,500 | 3000 | 402, 400, 462, 309, 319 | No (`exp_M028.json`) |
 
 M011 note: the name-only specialist (n_* columns only) hit the 3000 cap in all 5 folds at 180,000 S1, while the
 full-feature model converges at ~1500-2100: a weaker feature set needs MORE rounds at lr 0.05, so a specialist cap
