@@ -19,9 +19,12 @@ from transformers import AutoModel, AutoTokenizer
 REPO = "prathameshk421/ber-ce-scoring"
 K = int(os.environ.get("ITER_K", "10"))
 t0 = time.time()
+POOL_F = os.environ.get("ITER_POOL", "gate1_pool")      # test: drace_test_pool
+S1Q_F = os.environ.get("ITER_S1Q", "gate1_queries")     # test: dracd_test_s1_queries
+Q_F = os.environ.get("ITER_Q", "iter_train_queries")    # test: iter_test_queries
+OUT_F = os.environ.get("ITER_OUT", "iter_train_topk")   # test: iter_test_topk
 root = Path(snapshot_download(REPO, repo_type="dataset", local_dir="/tmp/it", allow_patterns=[
-    "retrieval/gate1_pool.parquet", "retrieval/gate1_queries.parquet", "retrieval/iter_train_queries.parquet",
-    "e5_distil/*"]))
+    f"retrieval/{POOL_F}.parquet", f"retrieval/{S1Q_F}.parquet", f"retrieval/{Q_F}.parquet", "e5_distil/*"]))
 dev = torch.device("cuda")
 tok = AutoTokenizer.from_pretrained(str(root / "e5_distil"))
 model = AutoModel.from_pretrained(str(root / "e5_distil"), dtype=torch.bfloat16).to(dev).eval()
@@ -41,22 +44,24 @@ def embed(texts, tag, batch=1024):
     return out
 
 
-pool = pq.read_table(root / "retrieval/gate1_pool.parquet")
+pool = pq.read_table(root / f"retrieval/{POOL_F}.parquet")
 p_idx = pool.column("pool_idx").to_numpy().astype(np.int64)
 p_cty = np.asarray(pool.column("country").to_pylist(), dtype=object)
 P = embed(pool.column("text").to_pylist(), "pool")
 row_of = np.full(p_idx.max() + 1, -1, dtype=np.int64)
 row_of[p_idx] = np.arange(p_idx.size)
-g1 = pq.read_table(root / "retrieval/gate1_queries.parquet").to_pandas()
+g1 = pq.read_table(root / f"retrieval/{S1Q_F}.parquet", columns=["qid", "kind", "text"]).to_pandas()
 s1_text = dict(zip(g1.qid[g1.kind == "s1"].astype(np.int64), g1.text[g1.kind == "s1"]))
-q = pq.read_table(root / "retrieval/iter_train_queries.parquet").to_pandas()
+q = pq.read_table(root / f"retrieval/{Q_F}.parquet").to_pandas()
 prof = q[q.kind == "profile"].reset_index(drop=True)
 hop = q[q.kind == "hop2"].reset_index(drop=True)
 S = embed([s1_text[int(s)] for s in prof.s1_idx], "S1")
-V = torch.empty((len(prof), 384), dtype=torch.float32, device=dev)
-for i, mem in enumerate(prof.members):
-    rows = torch.as_tensor(row_of[np.asarray(mem, dtype=np.int64)], device=dev)
-    V[i] = S[i].float() + P[rows].float().mean(0)
+lens = prof.members.map(len).to_numpy()
+flat = np.concatenate([np.asarray(m, dtype=np.int64) for m in prof.members])
+owner = torch.as_tensor(np.repeat(np.arange(len(prof)), lens), device=dev)
+M = torch.zeros((len(prof), 384), dtype=torch.float32, device=dev)
+M.index_add_(0, owner, P[torch.as_tensor(row_of[flat], device=dev)].float())
+V = S.float() + M / torch.as_tensor(lens, dtype=torch.float32, device=dev).unsqueeze(1)
 V = torch.nn.functional.normalize(V, dim=-1).half()
 H = P[torch.as_tensor(row_of[hop.self_pool.to_numpy()], device=dev)]
 Qv = torch.cat([V, H])
@@ -80,7 +85,7 @@ out = pa.table({"qid": pa.array(np.concatenate(cols["qid"]).astype(np.int64)),
                 "rank": pa.array(np.concatenate(cols["rank"]).astype(np.int16)),
                 "pool_idx": pa.array(np.concatenate(cols["pool_idx"]).astype(np.uint32)),
                 "cos": pa.array(np.concatenate(cols["cos"]).astype(np.float16))})
-pq.write_table(out, "/tmp/iter_train_topk.parquet", compression="zstd")
-HfApi().upload_file(path_or_fileobj="/tmp/iter_train_topk.parquet", path_in_repo="retrieval/iter_train_topk.parquet",
+pq.write_table(out, f"/tmp/{OUT_F}.parquet", compression="zstd")
+HfApi().upload_file(path_or_fileobj=f"/tmp/{OUT_F}.parquet", path_in_repo=f"retrieval/{OUT_F}.parquet",
                     repo_id=REPO, repo_type="dataset", commit_message="iter I1 topk")
 print(f"done {out.num_rows:,} rows ({time.time() - t0:.0f}s)", flush=True)

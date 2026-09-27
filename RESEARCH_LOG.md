@@ -45,7 +45,7 @@ Negative, flat, and failed runs are logged too — they are the part people forg
 | 3 matcher | MATCH_ALL held-out 165K | entity F0.5 | 0.98360 (full_comp; full_single 0.98161 same S1) | M005-full | `match_train_full_comp.json` |
 | 3 matcher | MATCH_ALL − DEV_REST_180K held-out 147K | entity F0.5 | 0.98537 (full_ce, + p_ce; full_single 0.98162 same S1) | S6-file | `match_train_full_ce.json` |
 | 3 matcher | MATCH_ALL − DEV_REST_180K held-out 147K | entity F0.5 | 0.98551 (full_ce_nf, + nfreq) | S7-file | `match_train_full_ce_nf.json` |
-| submission | test (public LB) | entity F0.5 | **0.983958 (S16)**; S14 0.983741; S13 0.983604; S12 0.983064; S11 0.981623; S10 0.98135; S7 0.976205; S6 0.976128; S2 0.966797; S1 0.966109; S3 0.966 (rounded) | S10-LB | `drace_test.json`, `reports/test_usage_log.md` |
+| submission | test (public LB) | entity F0.5 | **0.984028 (S17)**; S16 0.983958; S14 0.983741; S13 0.983604; S12 0.983064; S11 0.981623; S10 0.98135; S7 0.976205; S6 0.976128; S2 0.966797; S1 0.966109; S3 0.966 (rounded) | S10-LB | `drace_test.json`, `reports/test_usage_log.md` |
 
 ## Open questions
 
@@ -57,6 +57,55 @@ Negative, flat, and failed runs are logged too — they are the part people forg
 ---
 
 ## Log
+
+### 2026-09-27 · S17-LB · Submission 17 leaderboard: S16 + distilled S1 ranks 6-7, 0.984028 (rank 663) · ADOPTED
+- Log: `reports/test_usage_log.md` · File: `submission/output_v17/matching_results.tsv` (sha1 3adb3960…).
+- Result: public LB 0.984028 vs S16 0.983958: +0.00007. Train evidence +0.00004; transfer ≈ 1.75x (distilled-retriever
+  changes keep transferring above their train size, like S12/S13; seed expansion did not, S14).
+
+### 2026-09-27 · I1-test · Profile-query (iterative) retrieval on top of S17 · DROPPED (overlap)
+- Scripts: `plan/checks/iter_test_prep.py`, `plan/checks/iter_gate_prep.py`, `ce/hf_job/iter_job.py` (now env-parametrised,
+  batched profile sum) · Log: `logs/iter_gate_prep.log`. HF iter-test (h200) launched 23:15 and cancelled after the gate.
+- Train: profile top-5 pairs not reached by any S17 channel: 60,178, of which 83 true (ceiling ~+0.00003). I1's +0.00030
+  oracle was measured against S13's channels; seed ranks 3-5 and distilled S1 ranks 6-7 already recover almost all of it
+  (both also search around accepted records).
+
+### 2026-09-27 · A2 · DRACE c0 admission cut-off under test-like weighting (S17 channels) · DROPPED (flat)
+- Metrics: `admit_testlike.json` · Script: `plan/checks/admit_testlike.py` · Log: `logs/admit_testlike.log`.
+- Test-like weighted F0.5 0.98864-0.98867 for T 0.98-0.997; drops at 0.998+ (0.999: 0.98853). Halves chose 0.99 / 0.995;
+  cross-fitted vs 0.995 −0.00001. Keep 0.995.
+
+### 2026-09-27 · S17-file · S16 + distilled-e5 S1 query ranks 6-7 · INFO (upload candidate)
+- Parent: S16-file, D10 (ranks 6-7 restriction), SD5 · Metrics: `drace_test_s17.json` · Chain: `plan/checks/run_s17.sh`
+  (log `logs/run_s17.log`) · HF (h200): dracd7-test retrieval 12.8 min (~19-21K pool records/s, CPU tokenisation-bound),
+  dracd7-test-c0 scoring 853,936 pairs in 2.0 min (7,333 pairs/s, 2x the A100).
+- Base full_c0_rgrp_t073 (threshold 0.73). DRACE additions 83,104 (S16 80,800; +2,304, +0.0013 per S1); final 5,811,357
+  pairs; candidates 9.35 per S1. Validator PASS; sha1 3adb3960….
+- Train evidence: seed<=5 + D10 ranks 6-7 vs seed<=5: +0.00004 (seed5_eval.json). Expectation (d): LB +0.00002 to +0.0001.
+- Also: retrieve_job.py now tokenises batches ahead on CPU threads (RETR_PREFETCH, default 16); smoke set top-5 identical
+  to the old code (100% overlap). Next channel checked: distilled seed expansion ranks 1-2 has only 158 true pairs among
+  185,273 new train pairs (`logs/dseed_prep.log`), ceiling ~+0.00005: not scored.
+
+### 2026-09-27 · ER1 · Rescue S1 left empty with their best sub-0.995 DRACE pair · DROPPED (flat)
+- Metrics: `empty_rescue.json` · Script: `plan/checks/empty_rescue.py` · Log: `logs/empty_rescue.log`.
+- S16-equivalent 0.98875; 10,495 S1 end with no match, 10,126 of them (96%) truly have no copy. Admitting the S1's best
+  DRACE pair at c0 >= T2: 0.98 adds 9 pairs (6 true) +0.00002; 0.8 −0.00008; 0.5 −0.00022. Cross-fitted (both halves
+  chose 0.98) +0.00002.
+- Learned: empty predictions are already almost always right; there is nothing to rescue there.
+
+### 2026-09-27 · TH3 · Per-country LightGBM threshold (test-like weighted, cross-fitted by S1 half) · DROPPED (flat)
+- Metrics: `thr_country.json` · Script: `plan/checks/thr_country.py` · Log: `logs/thr_country.log`.
+- Halves chose global 0.73 both times; per-country US 0.73/0.72, India 0.72/0.78 (unstable). Cross-fitted per-country vs
+  global −0.00002. Both countries are flat between 0.72 and 0.76 (US 0.98888, India 0.98801).
+
+### 2026-09-27 · N14 · How many rejected name-only true pairs are same-name ties (c0 retrain ceiling) · INFO
+- Data: M027 OOF (threshold 0.73, one-owner) joined with rev_MATCH_TRAIN (pool name -> 20 nearest S1 names, same country).
+  Log: `logs/ambiguity_probe.log` (log only; no metrics JSON written).
+- True rejected name-only pairs 7,582: true S1 is the unique nearest S1 name 6.2%; nearest but tied with another S1 (within
+  0.02 cos) 30.7%; another S1 name is closer 63.1%. Accepted true name-only (14,141): unique nearest 70.0%.
+- Learned: for ~94% of the largest loss bucket, another S1 looks at least as plausible from the name alone, so a better
+  pairwise model (retrained c0) can reach at most ~470 of these pairs (~+0.0003 oracle on train). Not worth the last HF
+  credit or the deadline risk; c0 retrain DROPPED for tonight.
 
 ### 2026-09-27 · FINAL · S16 promoted to the live model · INFO
 - work/match/models now holds full_c0_rgrp at threshold 0.73 (was full_single, 0.69). Rebuild chain for S16:

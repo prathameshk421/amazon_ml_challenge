@@ -38,6 +38,7 @@ QTAG = os.environ.get("RETR_QUERY_TAG", TAG)  # queries file tag (pool file alwa
 K = int(os.environ.get("RETR_K", "50"))
 MAX_LEN = int(os.environ.get("RETR_MAX_LEN", "64"))
 BATCH = int(os.environ.get("RETR_BATCH", "1024"))
+PREFETCH = int(os.environ.get("RETR_PREFETCH", "16"))  # batches tokenised ahead on CPU threads
 QCHUNK = int(os.environ.get("RETR_QCHUNK", "1024"))  # 1024 x 6.2M fp16 = 12.7 GB
 INDEX = os.environ.get("RETR_INDEX", "exact")
 COMPARE = os.environ.get("RETR_COMPARE") == "1"
@@ -75,9 +76,21 @@ def embed(texts, tag):
     order = np.argsort([len(t) for t in texts], kind="stable")
     out = torch.empty((len(texts), model.config.hidden_size), dtype=torch.float16, device=dev)
     t0 = time.time()
-    for i in range(0, len(texts), BATCH):
+    # tokenise ahead on CPU threads (the fast tokenizer releases the GIL) so the GPU does not wait on it
+    from concurrent.futures import ThreadPoolExecutor
+    starts = list(range(0, len(texts), BATCH))
+
+    def prep(i):
+        b = tok([texts[j] for j in order[i:i + BATCH]], padding=True, truncation=True, max_length=MAX_LEN,
+                return_tensors="pt")
+        return {k: v.pin_memory() for k, v in b.items()} if dev.type == "cuda" else b
+    ex = ThreadPoolExecutor(max_workers=max(2, (os.cpu_count() or 4) - 2))
+    pending = {i: ex.submit(prep, i) for i in starts[:PREFETCH]}
+    for n, i in enumerate(starts):
+        if n + PREFETCH < len(starts):
+            pending[starts[n + PREFETCH]] = ex.submit(prep, starts[n + PREFETCH])
         idx = order[i:i + BATCH]
-        b = tok([texts[j] for j in idx], padding=True, truncation=True, max_length=MAX_LEN, return_tensors="pt").to(dev)
+        b = {k: v.to(dev, non_blocking=True) for k, v in pending.pop(i).result().items()}
         h = model(**b).last_hidden_state
         m = b["attention_mask"].unsqueeze(-1).to(h.dtype)
         e = torch.nn.functional.normalize((h * m).sum(1) / m.sum(1), dim=-1)
@@ -85,6 +98,7 @@ def embed(texts, tag):
         if (i // BATCH) % 1000 == 0:
             done = min(i + BATCH, len(texts))
             print(f"[{tag}] {done:,}/{len(texts):,} ({done / (time.time() - t0):.0f}/s)", flush=True)
+    ex.shutdown()
     print(f"[{tag}] {len(texts):,} embedded in {time.time() - t0:.0f}s", flush=True)
     return out
 
