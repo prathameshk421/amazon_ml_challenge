@@ -279,6 +279,125 @@ Negative, flat, and failed runs are logged too — they are the part people forg
 - Result: OOF 0.98545 vs M027 0.98552, Δ −0.00007 [−0.00017, 0.00003], 1,168 S1 changed.
 - Learned: c0 is ce_rec continued, so the older score carries no extra information. A second CE feature needs a
   model trained on different data or a different architecture to have a chance.
+### 2026-09-27 · M040 · stack + NN-vs-GBM disagreement cols on NN_C (config F on C) · DROPPED
+- Parent: M039 · Commit: f2136e4 + uncommitted (`ber/exp.py` nn:/nndis: groups) · Metrics: `artifacts/metrics/exp_M040.json` · Wall: ~2 min (5-fold, CPU LightGBM, ≤8 workers)
+- Hypothesis: M038 showed disagreement cols add a (barely-gate-passing) gain on NN_B scores; with the stronger NN_C the stacker should exploit NN/GBM disagreement regions more cleanly.
+- Change: groups `cex_p:ce_rec_c0` + `nn:NN_C` + `nndis:NN_C:M027` (78 feats); folds converged 201/251/229/215/234 of 3000, none truncated; decision threshold 0.71+one_owner.
+- Result: OOF F0.5 0.98584 vs M039 Δ+0.0000035 [−0.00010,+0.00011], n_changed=1390 — dead flat. MATCH_VALID confirm vs M039: Δ+0.00013 [−0.00011,+0.00037], n=20k — noise. nnd_abs/nnd_minus gains ~36k/35k (used) but zero paired effect: splits that don't move entities.
+- Learned: disagreement cols are decorrelated noise once the NN score itself is strong — M038's +0.00051 was the weak-NN case (stacker squeezing a bad score's residuals), not a general mechanism.
+- Next: none — kill the disagreement direction; see final verdict below.
+- Kill-criterion verdict (exploration goal): F-on-C fails to beat LightGBM+CE beyond noise → the F branch is dead. M038 stays parked on its own numbers, not as a live direction.
+
+### 2026-09-27 · M039 · LightGBM stack 68 + p_ce + NN_C score (config E on C) · PARKED (below gate)
+- Parent: M027 · Commit: f2136e4 + uncommitted (`ber/exp.py` nn: group) · Metrics: `artifacts/metrics/exp_M039.json` · Wall: ~2 min (5-fold, CPU LightGBM, ≤8 workers)
+- Hypothesis: NN_C (0.98482, only −0.00057 under M027) should complement M027 better than NN_B did — a near-parity second opinion.
+- Change: groups `cex_p:ce_rec_c0` + `nn:NN_C` (72 feats); folds converged 468/348/305/284/317 of 3000, none truncated; decision threshold 0.68+one_owner.
+- Result: OOF F0.5 0.98584 vs M027 Δ+0.00032 [+0.00019,+0.00046], n_changed=2259 — real (CI>0) but below the +0.0005 adoption gate. MATCH_VALID confirm vs M027: Δ+0.00020 [−0.00010,+0.00052], n=20k — consistent. p_NN_C gain 6.3M (#1, above ce_p 0.9M): the stacker leans on NN_C heavily yet nets +0.00032 — the NN's information is mostly redundant with the GBM, not complementary.
+- Learned: stacking a near-parity NN gives a real but sub-gate gain twice (M037/NN_B +0.00039, M039/NN_C +0.00032). Stronger NN ≠ more complementary.
+- Next: none standalone; M038 (F on NN_B, OOF Δ+0.00051) remains the only parked adoption candidate, pending sign-off (new model family).
+
+### 2026-09-27 · M043 · listwise-loss sweep on config-C setup (config D, λ ∈ {0, 0.1, 0.3, 1.0}) · DROPPED
+- Parent: M042 (λ=0 baseline) · Commit: f2136e4 + uncommitted (`nn_listwise.py --listwise`) · Metrics:
+  `artifacts/metrics/nn_NN_D_l{0,l01,l03,l1}_MATCH_VALID.json` · Log: `/tmp/opencode/nn_d.log`.
+- Hypothesis: C's residual gap looked like ranking quality, so a ListNet top-1 term (softmax over each list
+  vs the normalized label distribution, mean over lists with ≥1 positive — handles the 0.62 pos rate and
+  multi-positive lists) added to BCE should trade a little calibration for better within-list ranking and
+  close the Δ −0.00057 gap to M027.
+- Change: config-C setup (71 cols, same DEV_REST_180K train / MATCH_TRAIN cal / MATCH_VALID eval), loss =
+  BCE + λ·ListNet, λ ∈ {0, 0.1, 0.3, 1.0} as runs NN_D_l0/l01/l03/l1.
+- Result: MATCH_VALID F0.5 λ=0: 0.98482 (Δ −0.00057, exact C reproduction — determinism check passes);
+  λ=0.1: 0.98465 (Δ −0.00074 [−0.00122, −0.00025]); λ=0.3: 0.98403 (Δ −0.00135 [−0.00183, −0.00084]);
+  λ=1.0: 0.98319 (Δ −0.00219 [−0.00271, −0.00167]). Monotone degradation — every λ step costs ~0.0002–0.0008
+  with CIs excluding 0 on the negative side.
+- Learned: the listwise term hurts because the MATCH decision uses one global threshold (+ one_owner), so
+  cross-list calibration dominates within-list ranking; ListNet spends capacity re-scaling lists instead of
+  separating pairs globally. Pointwise BCE was already the right objective for this decision rule.
+- Next: none for the NN loss direction. Best NN remains λ=0 ≡ NN_C; stack it (M039/M040) the way M037/M038
+  stacked B.
+
+### 2026-09-27 · M042 · set-transformer + p_ce/rank/gap inputs (config C) · PARKED (stack-input candidate)
+- Parent: M027 (reference) / M041 (arch) · Commit: f2136e4 + uncommitted (`nn_listwise.py --extra ce`,
+  `work/ce/ce_rec_c0/DEV_REST_180K.parquet` scored locally with the c0 LoRA) · Metrics:
+  `artifacts/metrics/nn_NN_C_MATCH_VALID.json` · Log: `/tmp/opencode/nn_c.log`.
+- Hypothesis: B's gap was ranking quality (AUC 0.99781 vs 0.99948), not calibration; giving the NN the same
+  per-pair CE signal LightGBM gets (p_ce + per-list rank + gap → 71 cols) should close most of the gap while
+  keeping the SAB list context that stacking found complementary (M037/M038).
+- Change: same 325k-param set-transformer as B, input 68→71 cols; trained on DEV_REST_180K pairs with locally
+  scored ce_rec_c0 (977k pairs, 48.7 min GPU wall; job-vs-local fp check: 1 flip/600 rows, accepted as
+  training-input noise). 19 epochs, best DEV_REST val BCE 0.0884. Leakage: c0's parent adapter saw
+  DEV_REST_180K (continued epoch on DEV_REST_REST fold 0) — so p_ce carries weak train-set signal, but
+  MATCH_TRAIN/VALID are clean (c0 never saw them; same standing as M027's p_ce).
+- Result: MATCH_VALID F0.5 0.98539 (M027) → 0.98482, paired Δ −0.00057 [−0.00103, −0.00011] (n=20k, 401
+  changed); CI excludes 0 on the negative side — C alone does not beat M027, fails the gate. But +0.00934
+  over B (0.97548): the CE inputs carried the NN to near-parity. Decision threshold 0.95 + one_owner (same
+  as B); MATCH_TRAIN cal F0.5 0.98496. Note: metrics `wall_min` covers eval only (timing-field bug, same as
+  M041) — train was ~5 min like B.
+- Learned: with equal inputs the pointwise GBM still outranks the set-transformer by a small but real
+  margin. The remaining question is whether C's errors are *different* (stackable, like B's were) and
+  whether listwise loss (D) closes the ranking gap.
+- Next: D sweep (λ ∈ {0, 0.1, 0.3, 1.0} ListNet top-1, running); then stack the best NN (C or D-winner) the
+  way M037/M038 stacked B. λ=0 reproduces C (sanity check).
+
+### 2026-09-27 · M038 · LightGBM stack: E + NN-vs-GBM disagreement columns (config F) · PARKED (passes gate, needs sign-off)
+- Parent: M027 · Commit: f2136e4 + uncommitted (`nn_listwise.py`, `disagree.py`, `confirm_valid.py`,
+  `nn:`/`nndis:` groups in `ber/exp.py`) · Metrics: `artifacts/metrics/exp_M038.json`,
+  `work/match/runs/M038/confirm_MATCH_VALID.json` · Log: `work/logs/exp_M038.log` · Wall: ~2 min.
+- Hypothesis: M037's value concentrates where NN and GBM disagree; explicit routing columns (score gap,
+  rank gap, top-1 agreement, margin gap vs M027 OOF) should lift OOF over M037 if the routing is learnable.
+- Change: `exps/M038.json`, groups `cex_p:ce_rec_c0` + `nn:NN_B` + new `nndis:NN_B:M027` (6 cols; raw p_gbm
+  deliberately excluded so F tests disagreement value, not parent-copying). Folds converged
+  309/302/238/239/214, 0 truncated. Leakage: p_nn never saw MATCH_TRAIN (B trained on DEV_REST_180K);
+  p_gbm is out-of-fold — standard clean stacking, no VALID labels anywhere.
+- Result: OOF F0.5 0.98552 → 0.98603, paired Δ +0.00051 [+0.00039, +0.00064] (n=180k, 1,965 changed) —
+  passes the +0.0005 gate with CI > 0. MATCH_VALID confirm: 0.98539 → 0.98585, paired Δ +0.00046
+  [+0.00012, +0.00082] (n=20k, 202 changed); CI excludes 0, point estimate just under the gate.
+  M037 on VALID for reference: Δ +0.00027 [−0.00013, +0.00067] (CI includes 0) — F > E on both sets.
+  Stacker gains: ce_p 4.9M, p_NN_B 2.1M, nnd_minus 115k, nnd_abs 96k (real use, ~5% of p_NN_B).
+  Decision flipped to expected_f + one-owner (expected_f+oo 0.98603 vs threshold+oo 0.98590): F improves
+  probability quality, not just the threshold. Segments: match_1 +0.00445 (where B alone was weakest),
+  match_2_3 +0.00077; but singleton −0.00265 [−0.00373, −0.00147] — worse with CI excluding 0, likely tied
+  to the expected_f switch predicting more on singletons.
+- Learned: the kill criterion is not met — F beats LightGBM+CE beyond noise on both sets, so the direction
+  stays alive. But the margin over the gate is 0.00001 on OOF with a singleton regression attached.
+- Next: adoption decision (new model family → sign-off required); if adopted, make live + TEST file.
+  C/D (CE-augmented NN) still blocked on ce_rec_c0 scoring of DEV_REST_180K (977k pairs).
+
+### 2026-09-27 · M037 · LightGBM stack: M027 features + NN_B score group (config E) · PARKED
+- Parent: M027 · Commit: f2136e4 + uncommitted (`nn_listwise.py`, `disagree.py`, `nn:` group in `ber/exp.py`) ·
+  Metrics: `artifacts/metrics/exp_M037.json` · Log: `work/logs/exp_M037.log` · Wall: ~2 min.
+- Hypothesis: NN_B (set-transformer, trained on disjoint DEV_REST_180K, never saw MATCH_TRAIN) gives clean
+  out-of-sample per-pair scores; its SAB list context is inexpressible to the pointwise GBM, so stacking
+  p_NN_B + list rank/gap should raise OOF F0.5 over M027 if any of B's signal is complementary.
+- Change: `exps/M037.json`, groups `cex_p:ce_rec_c0` + new `nn:NN_B` (p, list rank, gap; mirrors `ce:` group,
+  reads `work/match/runs/NN_B/<SET>_pairs.parquet`). Same 5-fold/cap-3000 as M027; folds converged
+  304/399/206/228/239, 0 truncated. Also fixed `compare_to_parent`/`band_mask` to skip (not crash on) the
+  band split when `x1_strsim/oof.parquet` is absent on this box.
+- Result: OOF F0.5 0.98552 → 0.98591, paired Δ +0.00039 [0.00027, 0.00052], 2,250 S1 changed (n=180k).
+  Below the +0.0005 adoption gate → PARKED. CI excludes 0: the gain is real but small. Stacker uses p_NN_B
+  heavily (gain 1.9M, 2nd after ce_p 5.3M; gap 108k, rank ~1k). No segment worse (all seg Δ ≥ 0 except
+  match_1 −0.00069 with CI crossing 0); best: singleton +0.00098, match_2_3 +0.00061, chain_2_9 +0.00059.
+  Disagreement census (disagree.py, MATCH_TRAIN): NN-right/GBM-wrong 1,895 S1 (1.05%) vs reverse 11,033
+  (6.13%); no segment has positive mean Δ for the NN alone — the stacker, not the NN, extracts the value.
+- Learned: B's list-context signal is complementary but weak; the pointwise GBM was already capturing ~all
+  of it. Expect F (explicit disagreement columns) to add little.
+- Next: M038 (config F: E + NN-vs-GBM disagreement columns).
+
+### 2026-09-27 · M041 · set-transformer listwise matcher, BCE-only, 68 base features (config B) · DROPPED
+- Parent: M027 · Commit: f2136e4 + uncommitted `nn_listwise.py` · Metrics: `nn_NN_B_MATCH_VALID.json` ·
+  Log: `work/match/runs/NN_B/train.log` · Wall: ~5 min (23 epochs, early stop patience 5 on DEV_REST val BCE).
+- Hypothesis: jointly scoring an S1's candidate list (self-attention across candidates) beats pointwise
+  LightGBM because list context (gaps, ranks, competing candidates) disambiguates close pairs.
+- Change: set-transformer (per-candidate MLP 68→256→128, 2× SAB d=128/4 heads, MLP decoder; 325k params),
+  BCE pos_weight 8 (mirrors match `1+7*is_pos`), train DEV_REST_180K (175k S1; 5k S1 val), standardize with
+  NaN→mean imputation, decision via `choose_decision` on MATCH_TRAIN. Model: `work/match/runs/NN_B/models/`.
+- Result: MATCH_VALID 0.98539 → 0.97548, paired Δ −0.00991 [−0.01107, −0.00882], 1,379 S1 changed.
+  Pair ranking: AUC 0.99781 vs M027 0.99948, logloss 0.093 vs 0.027. Decision: threshold 0.95 + one-owner
+  (scores poorly separated). Not a calibration artifact — the ranking itself is worse.
+- Learned: the 325k-param MLP underfits tabular matching scores even in-sample (MATCH_TRAIN cal F0.5 0.97559
+  vs M027 OOF 0.98552). Two handicaps vs LightGBM: (1) NaN-missingness (empty-address signals in 20 cols)
+  collapses to the mean; (2) no tree-style sharp thresholds. List context did not compensate.
+- Next: C adds p_ce (+rank/gap) — needs ce_rec_c0 scoring of DEV_REST_180K (977k pairs; MATCH scores came
+  from HF job c0-score-train, DEV_REST never scored). E/F stack tests run on B scores regardless.
 
 ### 2026-09-27 · S8-file · M027 on TEST: 68 live features + ce_rec_c0 p_ce, MATCH_TRAIN 5-fold models · INFO (upload candidate)
 - Parent: M027 · Metrics: `exp_M027.json` (OOF 0.98552), `exp_predict_TEST_M027.json` · Chain:

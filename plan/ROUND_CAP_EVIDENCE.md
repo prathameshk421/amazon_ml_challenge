@@ -59,6 +59,10 @@ is the fix — a measured table, and a mechanical check to run after every train
 | exp M026 main (180,000 S1, CE-derived family) | 975,699 | ~702,500 | 3000 | 545, 716, 561, 490, 427 | No (`exp_M026.json`) |
 | exp M027 main (180,000 S1, cex_p ce_rec_c0) | 975,699 | ~702,500 | 3000 | 422, 383, 454, 394, 370 | No (`exp_M027.json`) |
 | exp M028 main (180,000 S1, ce_rec + ce_rec_c0) | 975,699 | ~702,500 | 3000 | 402, 400, 462, 309, 319 | No (`exp_M028.json`) |
+| exp M037 main (180,000 S1, + p_ce + nn_B score group, 72 feats) | 975,699 | ~702,500 | 3000 | 304, 399, 206, 228, 239 | No (`exp_M037.json`) |
+| exp M038 main (180,000 S1, + p_ce + nn_B + nndis disagreement, 78 feats) | 975,699 | ~702,500 | 3000 | 309, 302, 238, 215, 214 | No (`exp_M038.json`) |
+| exp M039 main (180,000 S1, + p_ce + nn_C score group, 72 feats) | 975,699 | ~702,500 | 3000 | 468, 348, 305, 284, 317 | No (`exp_M039.json`) |
+| exp M040 main (180,000 S1, + p_ce + nn_C + nndis disagreement, 78 feats) | 975,699 | ~702,500 | 3000 | 201, 251, 229, 215, 234 | No (`exp_M040.json`) |
 
 M011 note: the name-only specialist (n_* columns only) hit the 3000 cap in all 5 folds at 180,000 S1, while the
 full-feature model converges at ~1500-2100: a weaker feature set needs MORE rounds at lr 0.05, so a specialist cap

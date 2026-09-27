@@ -15,6 +15,7 @@ uncertain-band stratum).
 Feature groups compute from inputs only (feature table, candidate lists, p_rerank); labels are joined only
 for fitting and scoring MATCH_TRAIN, as in match-train.
 """
+
 import json
 import math
 import time
@@ -26,11 +27,19 @@ import pyarrow.parquet as pq
 
 from ber import io_utils, match
 
-TRAIN_UNIVERSE = ("MATCH_TRAIN", "MATCH_VALID", "DEV_REST_180K", "DEV_REST_REST", "DEV_B", "HOLDOUT_TEST")
+TRAIN_UNIVERSE = (
+    "MATCH_TRAIN",
+    "MATCH_VALID",
+    "DEV_REST_180K",
+    "DEV_REST_REST",
+    "DEV_B",
+    "HOLDOUT_TEST",
+)
 BAND = (0.1, 0.9)
 
 
 # ---------------------------------------------------------------- feature groups
+
 
 def _col(X, name):
     return X[:, match._COL[name]].astype(np.float64)
@@ -40,7 +49,11 @@ def _list_stats(s1, v):
     """Per-row list mean, std (ddof 0) and size of v over each S1's rows, NaN-aware."""
     df = pd.DataFrame({"s": s1, "v": v})
     g = df.groupby("s", sort=False)["v"]
-    return g.transform("mean").to_numpy(), g.transform("std", ddof=0).to_numpy(), g.transform("size").to_numpy()
+    return (
+        g.transform("mean").to_numpy(),
+        g.transform("std", ddof=0).to_numpy(),
+        g.transform("size").to_numpy(),
+    )
 
 
 def _z(s1, v):
@@ -58,8 +71,12 @@ def group_dinv(set_name, X, s1, pool):
     g = df.groupby("s", sort=False)["p"]
     n = g.transform("size").to_numpy().astype(np.float64)
     med = g.transform("median").to_numpy()
-    share05 = (df.assign(b=(prr >= 0.5).astype(np.float64)).groupby("s", sort=False)["b"]
-               .transform("mean").to_numpy())
+    share05 = (
+        df.assign(b=(prr >= 0.5).astype(np.float64))
+        .groupby("s", sort=False)["b"]
+        .transform("mean")
+        .to_numpy()
+    )
     # share of the OTHER candidates whose p_rerank is within 0.1 of this one (near-ties)
     close = np.zeros(prr.size)
     _, start, stop = match.group_bounds(s1)
@@ -68,8 +85,18 @@ def group_dinv(set_name, X, s1, pool):
             p = prr[a:b]
             close[a:b] = ((np.abs(p[:, None] - p[None, :]) < 0.1).sum(1) - 1) / (b - a - 1)
     close[n < 2] = np.nan
-    out = np.column_stack([_z(s1, prr), np.where(n >= 2, (rank - 1) / np.maximum(n - 1, 1), np.nan),
-                           share05, prr - med, close, _z(s1, ntset), _z(s1, atset), _z(s1, nidf)])
+    out = np.column_stack(
+        [
+            _z(s1, prr),
+            np.where(n >= 2, (rank - 1) / np.maximum(n - 1, 1), np.nan),
+            share05,
+            prr - med,
+            close,
+            _z(s1, ntset),
+            _z(s1, atset),
+            _z(s1, nidf),
+        ]
+    )
     return out.astype(np.float32)
 
 
@@ -86,9 +113,15 @@ def _universe(set_name):
             t = pq.read_table(p, columns=["s1_idx", "pool_idx", "rank", "p_rerank"])
             rank, prr = t.column("rank").to_numpy(), t.column("p_rerank").to_numpy()
             keep = (rank <= cf["K_min"]) | (prr >= cf["p_min"]) if cf else np.ones(rank.size, bool)
-            parts.append(pd.DataFrame({"s1": t.column("s1_idx").to_numpy()[keep].astype(np.int64),
-                                       "pool": t.column("pool_idx").to_numpy()[keep].astype(np.int64),
-                                       "prr": prr[keep].astype(np.float64)}))
+            parts.append(
+                pd.DataFrame(
+                    {
+                        "s1": t.column("s1_idx").to_numpy()[keep].astype(np.int64),
+                        "pool": t.column("pool_idx").to_numpy()[keep].astype(np.int64),
+                        "prr": prr[keep].astype(np.float64),
+                    }
+                )
+            )
     return pd.concat(parts, ignore_index=True).drop_duplicates(["s1", "pool"])
 
 
@@ -121,10 +154,17 @@ def group_comp(set_name, X, s1, pool):
     cols = ["c_log_n_own", "c_rank_q", "c_margin", "c_n_other_ge05", "c_best_other"]
     out = u[cols].to_numpy()[pos]
     # per-S1: share of its list it does not win, and share it loses by >= 0.2
-    df = pd.DataFrame({"s": s1, "nb": (out[:, 1] > 1).astype(np.float64),
-                       "lose": (np.nan_to_num(out[:, 2], nan=1.0) <= -0.2).astype(np.float64)})
+    df = pd.DataFrame(
+        {
+            "s": s1,
+            "nb": (out[:, 1] > 1).astype(np.float64),
+            "lose": (np.nan_to_num(out[:, 2], nan=1.0) <= -0.2).astype(np.float64),
+        }
+    )
     g = df.groupby("s", sort=False)
-    out = np.column_stack([out, g["nb"].transform("mean").to_numpy(), g["lose"].transform("mean").to_numpy()])
+    out = np.column_stack(
+        [out, g["nb"].transform("mean").to_numpy(), g["lose"].transform("mean").to_numpy()]
+    )
     return out.astype(np.float32)
 
 
@@ -134,8 +174,10 @@ _SIB_NAME, _SIB_ADDR = 90.0, 80.0
 def _sib_chunk(task):
     """Candidate-to-candidate evidence for a chunk of S1 lists (worker)."""
     from rapidfuzz import fuzz, process
+
     split, pool, prr, ntset, atset, bounds = task
     from ber.rerank import PoolTextReader
+
     with PoolTextReader(split) as ptr:
         names, addrs, src = ptr.name(pool), ptr.addr(pool), np.asarray(ptr.src(pool))
     out = np.full((pool.size, 8), np.nan, dtype=np.float32)
@@ -145,7 +187,9 @@ def _sib_chunk(task):
             out[a:b, 0:2] = 0.0
             continue
         nm = process.cdist(names[a:b], names[a:b], scorer=fuzz.token_set_ratio, workers=1)
-        ad = process.cdist(addrs[a:b], addrs[a:b], scorer=fuzz.token_set_ratio, workers=1).astype(np.float64)
+        ad = process.cdist(addrs[a:b], addrs[a:b], scorer=fuzz.token_set_ratio, workers=1).astype(
+            np.float64
+        )
         empty = np.array([not s for s in addrs[a:b]])
         ad[empty, :] = np.nan
         ad[:, empty] = np.nan
@@ -177,6 +221,7 @@ def group_sib(set_name, X, s1, pool):
     (no model score is stacked; X3's stacked pass-1 p broke singletons). A near-duplicate = another candidate
     of the same S1 with name token-set >= 90 and address token-set >= 80 (or an empty address)."""
     from concurrent.futures import ProcessPoolExecutor
+
     split = "test" if set_name == "TEST" else "train"
     prr, ntset, atset = _col(X, "p_rerank"), _col(X, "n_tset"), _col(X, "a_tset")
     _, start, stop = match.group_bounds(s1)
@@ -190,7 +235,19 @@ def group_sib(set_name, X, s1, pool):
         return np.vstack(list(ex.map(_sib_chunk, tasks)))
 
 
-_UNIT_WORDS = {"unit", "apartment", "apt", "suite", "ste", "flat", "room", "rm", "floor", "fl", "no"}
+_UNIT_WORDS = {
+    "unit",
+    "apartment",
+    "apt",
+    "suite",
+    "ste",
+    "flat",
+    "room",
+    "rm",
+    "floor",
+    "fl",
+    "no",
+}
 
 
 def _num_state(a, b):
@@ -205,8 +262,11 @@ def _num_state(a, b):
 def _addr_nums(text):
     toks = text.split()
     nums = [t for t in toks if t.isdigit()]
-    unit = frozenset(toks[i + 1].lstrip("0") for i in range(len(toks) - 1)
-                     if toks[i] in _UNIT_WORDS and toks[i + 1].isdigit())
+    unit = frozenset(
+        toks[i + 1].lstrip("0")
+        for i in range(len(toks) - 1)
+        if toks[i] in _UNIT_WORDS and toks[i + 1].isdigit()
+    )
     post = frozenset(t for t in nums if len(t) >= 5)
     return nums, unit, post
 
@@ -219,14 +279,23 @@ def _num_rows(q_addr, p_addr):
         a, b = qn[0].lstrip("0") or "0", pn[0].lstrip("0") or "0"
         if a == b:
             out[0] = 2
-        elif len(a) != len(b) and (a.endswith(b) or a.startswith(b) or b.endswith(a) or b.startswith(a)):
+        elif len(a) != len(b) and (
+            a.endswith(b) or a.startswith(b) or b.endswith(a) or b.startswith(a)
+        ):
             out[0] = 3  # digit dropped / added: 106 vs 06, 313 vs 31
         else:
             out[0] = 4
         out[1] = math.log1p(abs(int(a[:15]) - int(b[:15])))
         qs, ps = {t.lstrip("0") for t in qn}, {t.lstrip("0") for t in pn}
-        out[2] = float(any(x != y and len(x) != len(y) and (x.endswith(y) or x.startswith(y) or y.endswith(x)
-                                                             or y.startswith(x)) for x in qs for y in ps))
+        out[2] = float(
+            any(
+                x != y
+                and len(x) != len(y)
+                and (x.endswith(y) or x.startswith(y) or y.endswith(x) or y.startswith(x))
+                for x in qs
+                for y in ps
+            )
+        )
         shared = [t.lstrip("0") for t in qn if t.lstrip("0") in ps]
         pshared = [t.lstrip("0") for t in pn if t.lstrip("0") in qs]
         out[7] = float(shared == pshared) if len(shared) >= 2 else np.nan
@@ -241,9 +310,12 @@ def _num_rows(q_addr, p_addr):
 def _num_chunk(task):
     split, q_addrs, pool = task
     from ber.rerank import PoolTextReader
+
     with PoolTextReader(split) as ptr:
         p_addrs = ptr.addr(pool)
-    return np.array([_num_rows(q, p) for q, p in zip(q_addrs, p_addrs)], dtype=np.float32).reshape(-1, 8)
+    return np.array([_num_rows(q, p) for q, p in zip(q_addrs, p_addrs)], dtype=np.float32).reshape(
+        -1, 8
+    )
 
 
 def group_num(set_name, X, s1, pool):
@@ -251,14 +323,20 @@ def group_num(set_name, X, s1, pool):
     different and its log distance, any digit-drop pair, postal-like (>= 5 digits) and unit-number agreement,
     number counts, and whether shared numbers appear in the same order (word-order transposition check)."""
     from concurrent.futures import ProcessPoolExecutor
+
     split = "test" if set_name == "TEST" else "train"
-    norm = pd.read_parquet(io_utils.work_path("norm", f"{split}_s1.parquet"), columns=["s1_idx", "addr_norm"])
+    norm = pd.read_parquet(
+        io_utils.work_path("norm", f"{split}_s1.parquet"), columns=["s1_idx", "addr_norm"]
+    )
     if not np.array_equal(norm["s1_idx"].to_numpy(), np.arange(len(norm))):
         raise RuntimeError(f"norm/{split}_s1.parquet: s1_idx is not 0..n-1")
     q_addr = norm["addr_norm"].to_numpy()[s1]
     del norm
     step = 100_000
-    tasks = [(split, [a or "" for a in q_addr[i:i + step]], pool[i:i + step]) for i in range(0, s1.size, step)]
+    tasks = [
+        (split, [a or "" for a in q_addr[i : i + step]], pool[i : i + step])
+        for i in range(0, s1.size, step)
+    ]
     with ProcessPoolExecutor(max_workers=io_utils.n_workers(io_utils.load_config())) as ex:
         return np.vstack(list(ex.map(_num_chunk, tasks)))
 
@@ -269,16 +347,30 @@ _LEGAL_RE = r"\b(pvt|private|ltd|limited|llc|inc|co|corp|corporation|company|the
 
 def _name_key(names):
     s = pd.Series(names).fillna("").astype(str).str.lower()
-    return s.str.replace(_LEGAL_RE, "", regex=True).str.replace(r"[^a-z0-9]", "", regex=True).to_numpy()
+    return (
+        s.str.replace(_LEGAL_RE, "", regex=True)
+        .str.replace(r"[^a-z0-9]", "", regex=True)
+        .to_numpy()
+    )
 
 
 def _nfreq_tables(split):
     """(S1 name keys, pool name keys, S1 key counts, pool key counts) of one split's own tables (label-free)."""
     if split not in _NFREQ_CACHE:
-        s1k = _name_key(pq.read_table(io_utils.work_path("records", f"{split}_s1.parquet"),
-                                      columns=["name_raw"]).column("name_raw").to_pylist())
-        pk = _name_key(pq.read_table(io_utils.work_path("records", f"{split}_pool.parquet"),
-                                     columns=["name_raw"]).column("name_raw").to_pylist())
+        s1k = _name_key(
+            pq.read_table(
+                io_utils.work_path("records", f"{split}_s1.parquet"), columns=["name_raw"]
+            )
+            .column("name_raw")
+            .to_pylist()
+        )
+        pk = _name_key(
+            pq.read_table(
+                io_utils.work_path("records", f"{split}_pool.parquet"), columns=["name_raw"]
+            )
+            .column("name_raw")
+            .to_pylist()
+        )
         _NFREQ_CACHE[split] = (s1k, pk, pd.Series(s1k).value_counts(), pd.Series(pk).value_counts())
     return _NFREQ_CACHE[split]
 
@@ -349,14 +441,57 @@ GROUPS = {
     "grp_full": (GRP_COLS, group_grp_full),
     "rev": (REV_COLS, group_rev),
     "nfreq": (["nf_pool_name_in_s1", "nf_pool_name_in_pool", "nf_s1_name_in_s1"], group_nfreq),
-    "num":(["nm_first_state", "nm_first_logdiff", "nm_any_digit_drop", "nm_post_state", "nm_unit_state",
-             "nm_q_n", "nm_p_n", "nm_shared_same_order"], group_num),
-    "sib": (["sb_n_dup", "sb_n_dup_other_src", "sb_dup_max_prr", "sb_dup_max_ntset", "sb_dup_max_atset",
-             "sb_best_name_sim", "sb_best_addr_sim", "sb_cluster_share"], group_sib),
-    "dinv": (["d_prr_z", "d_rank_frac", "d_share_prr05", "d_prr_minus_med", "d_share_prr_close",
-              "d_ntset_z", "d_atset_z", "d_nidf_z"], group_dinv),
-    "comp": (["c_log_n_own", "c_rank_q", "c_margin", "c_n_other_ge05", "c_best_other",
-              "c_q_share_not_best", "c_q_share_lose02"], group_comp),
+    "num": (
+        [
+            "nm_first_state",
+            "nm_first_logdiff",
+            "nm_any_digit_drop",
+            "nm_post_state",
+            "nm_unit_state",
+            "nm_q_n",
+            "nm_p_n",
+            "nm_shared_same_order",
+        ],
+        group_num,
+    ),
+    "sib": (
+        [
+            "sb_n_dup",
+            "sb_n_dup_other_src",
+            "sb_dup_max_prr",
+            "sb_dup_max_ntset",
+            "sb_dup_max_atset",
+            "sb_best_name_sim",
+            "sb_best_addr_sim",
+            "sb_cluster_share",
+        ],
+        group_sib,
+    ),
+    "dinv": (
+        [
+            "d_prr_z",
+            "d_rank_frac",
+            "d_share_prr05",
+            "d_prr_minus_med",
+            "d_share_prr_close",
+            "d_ntset_z",
+            "d_atset_z",
+            "d_nidf_z",
+        ],
+        group_dinv,
+    ),
+    "comp": (
+        [
+            "c_log_n_own",
+            "c_rank_q",
+            "c_margin",
+            "c_n_other_ge05",
+            "c_best_other",
+            "c_q_share_not_best",
+            "c_q_share_lose02",
+        ],
+        group_comp,
+    ),
 }
 
 
@@ -390,6 +525,111 @@ def _ce_p(ce_name, set_name, s1, pool):
     return p
 
 
+def _nn_p(run, set_name, s1, pool):
+    """NN listwise score from work/match/runs/<run>/<SET>_pairs.parquet (nn_listwise.py), joined on
+    (s1_idx, pool_idx). Same join semantics as _ce_p; a missing file raises (never filled silently)."""
+    path = match.runs_dir(run) / f"{set_name}_pairs.parquet"
+    if not path.exists():
+        raise RuntimeError(f"{path} missing: score {set_name} with nn_listwise.py predict first")
+    t = pq.read_table(path, columns=["s1_idx", "pool_idx", "p"])
+    cs1, cpool = t.column("s1_idx").to_numpy(), t.column("pool_idx").to_numpy()
+    pc = t.column("p").to_numpy().astype(np.float64)
+    if cs1.size == s1.size and np.array_equal(cs1, s1) and np.array_equal(cpool, pool):
+        p = pc
+    else:
+        key = s1.astype(np.int64) << 32 | pool.astype(np.int64)
+        ckey = cs1.astype(np.int64) << 32 | cpool.astype(np.int64)
+        order = np.argsort(ckey)
+        pos = np.minimum(np.searchsorted(ckey, key, sorter=order), max(ckey.size - 1, 0))
+        hit = ckey[order[pos]] == key
+        p = np.where(hit, pc[order[pos]], np.nan)
+    return p
+
+
+def group_nn(run, set_name, s1, pool):
+    """NN score, its rank inside the S1 list (1 = best) and the gap to the list max (mirrors group_ce)."""
+    p = _nn_p(run, set_name, s1, pool)
+    g = pd.DataFrame({"s": s1, "p": p}).groupby("s", sort=False)["p"]
+    rank = g.rank(ascending=False, method="min").to_numpy()
+    gap = g.transform("max").to_numpy() - p
+    return np.column_stack([p, rank, gap])
+
+
+def _gbm_p(gbm_run, set_name, s1, pool):
+    """Parent GBM's per-pair scores: work/match/runs/<run>/<SET>_pairs.parquet (column p) when present,
+    else the MATCH_TRAIN oof.parquet (column p_cal, exact row order required). Missing both raises."""
+    rd = match.runs_dir(gbm_run)
+    pp = rd / f"{set_name}_pairs.parquet"
+    if pp.exists():
+        t = pq.read_table(pp, columns=["s1_idx", "pool_idx", "p"])
+        cs1, cpool = t.column("s1_idx").to_numpy(), t.column("pool_idx").to_numpy()
+        pc = t.column("p").to_numpy().astype(np.float64)
+        if cs1.size == s1.size and np.array_equal(cs1, s1) and np.array_equal(cpool, pool):
+            return pc
+    elif set_name == "MATCH_TRAIN":
+        t = pq.read_table(rd / "oof.parquet")
+        cs1 = t.column("s1_idx").to_numpy()
+        cpool = t.column("pool_idx").to_numpy()
+        if not (np.array_equal(cs1, s1) and np.array_equal(cpool, pool)):
+            raise RuntimeError(f"{gbm_run} OOF rows differ from MATCH_TRAIN feature rows")
+        return t.column("p_cal").to_numpy().astype(np.float64)
+    else:
+        raise RuntimeError(f"{pp} missing: score {set_name} with the {gbm_run} models first")
+    key = s1.astype(np.int64) << 32 | pool.astype(np.int64)
+    ckey = cs1.astype(np.int64) << 32 | cpool.astype(np.int64)
+    order = np.argsort(ckey)
+    pos = np.minimum(np.searchsorted(ckey, key, sorter=order), max(ckey.size - 1, 0))
+    hit = ckey[order[pos]] == key
+    return np.where(hit, pc[order[pos]], np.nan)
+
+
+def group_nndis(nn_run, gbm_run, set_name, s1, pool):
+    """NN-vs-GBM disagreement columns (config F): signed/absolute score gap, list-rank gap, top-1
+    agreement and margin gap. Raw p_gbm is deliberately NOT a feature: F tests disagreement value, and
+    the stacker already has p_NN_B plus all base features for levels."""
+    pn = _nn_p(nn_run, set_name, s1, pool)
+    pg = _gbm_p(gbm_run, set_name, s1, pool)
+    df = pd.DataFrame({"s": s1, "pn": pn, "pg": pg})
+    g = df.groupby("s", sort=False)
+    rn = g["pn"].rank(ascending=False, method="min").to_numpy()
+    rg = g["pg"].rank(ascending=False, method="min").to_numpy()
+    # list-top p and 2nd-best p per scorer, broadcast to rows
+    order_n = np.lexsort((-pn, s1))
+    order_g = np.lexsort((-pg, s1))
+    top = {}
+    for tag, order, p in (("n", order_n, pn), ("g", order_g, pg)):
+        ss = s1[order]
+        start = np.r_[True, ss[1:] != ss[:-1]]
+        gs = np.flatnonzero(start)
+        gn = np.diff(np.r_[gs, ss.size])
+        gid = np.cumsum(start) - 1
+        ps = p[order]
+        t1 = ps[gs][gid]
+        t2 = np.where(gn[gid] >= 2, ps[np.minimum(gs[gid] + 1, ss.size - 1)], np.nan)
+        inv = np.empty_like(order)
+        inv[order] = np.arange(order.size)
+        top[tag] = (t1[inv], t2[inv], gs[gid][inv], gn[gid][inv], order, inv)
+    n_t1, n_t2, _, _, _, _ = top["n"]
+    g_t1, g_t2, _, _, order_gb, inv_g = top["g"]
+    # argmax rows: first row of each list in the sorted order
+    is_n_top = np.zeros(s1.size, bool)
+    is_n_top[order_n[np.flatnonzero(np.r_[True, s1[order_n][1:] != s1[order_n][:-1]])]] = True
+    is_g_top = np.zeros(s1.size, bool)
+    is_g_top[order_gb[np.flatnonzero(np.r_[True, s1[order_gb][1:] != s1[order_gb][:-1]])]] = True
+    agree = (is_n_top & is_g_top).astype(np.float64)
+    agree = pd.Series(agree).groupby(s1, sort=False).transform("max").to_numpy()
+    return np.column_stack(
+        [
+            pn - pg,
+            np.abs(pn - pg),
+            rn - rg,
+            agree,
+            (n_t1 - np.nan_to_num(n_t2, nan=n_t1)) - (g_t1 - np.nan_to_num(g_t2, nan=g_t1)),
+            pn - g_t1,
+        ]
+    )
+
+
 # CE-derived feature families (plan/checks/cefe_ablation.py): everything a tree cannot build from p_ce alone in
 # one split — position and competition inside the S1 list, list shape, disagreement with stage 2, and products
 # with single evidence columns. Each family repeats ce_p so it can be tested alone on top of the 68 base columns.
@@ -397,17 +637,69 @@ _SAME_NAME = 0.95  # n_tset at or above this = "same-name" candidate
 CEX_FAMILIES = {
     "p": ["ce_p"],
     "raw": ["ce_p", "ce_logit", "ce_entropy", "ce_conf"],
-    "rank": ["ce_p", "ce_rank", "ce_rank_pct", "ce_top1", "ce_top2", "ce_top3", "ce_gap_top1", "ce_gap_next",
-             "ce_gap_prev", "ce_t1_t2", "ce_t2_t3"],
-    "list": ["ce_p", "ce_l_mean", "ce_l_std", "ce_l_max", "ce_l_min", "ce_z", "ce_pctile", "ce_softmax",
-             "ce_ratio_max", "ce_n_ge05", "ce_n_ge07", "ce_n_ge08", "ce_n_ge09", "ce_frac_above", "ce_l_entropy",
-             "ce_softmax_hhi", "ce_t1_t2", "ce_t1_t3", "ce_samename_n", "ce_samename_rank"],
-    "dis": ["ce_p", "ce_minus_prr", "ce_abs_prr", "ce_rank_minus_s2", "ce_top1_is_s2top1", "ce_s2_top1_agree",
-            "ce_margin_minus_s2", "ce_minus_s2top1"],
-    "int": ["ce_p", "ce_x_ntset", "ce_x_atset", "ce_x_cmatch", "ce_x_house", "ce_x_numjacc", "ce_x_prr",
-            "ce_x_s2rank", "ce_x_ln", "ce_x_aempty", "ce_x_chain", "ce_x_src"],
+    "rank": [
+        "ce_p",
+        "ce_rank",
+        "ce_rank_pct",
+        "ce_top1",
+        "ce_top2",
+        "ce_top3",
+        "ce_gap_top1",
+        "ce_gap_next",
+        "ce_gap_prev",
+        "ce_t1_t2",
+        "ce_t2_t3",
+    ],
+    "list": [
+        "ce_p",
+        "ce_l_mean",
+        "ce_l_std",
+        "ce_l_max",
+        "ce_l_min",
+        "ce_z",
+        "ce_pctile",
+        "ce_softmax",
+        "ce_ratio_max",
+        "ce_n_ge05",
+        "ce_n_ge07",
+        "ce_n_ge08",
+        "ce_n_ge09",
+        "ce_frac_above",
+        "ce_l_entropy",
+        "ce_softmax_hhi",
+        "ce_t1_t2",
+        "ce_t1_t3",
+        "ce_samename_n",
+        "ce_samename_rank",
+    ],
+    "dis": [
+        "ce_p",
+        "ce_minus_prr",
+        "ce_abs_prr",
+        "ce_rank_minus_s2",
+        "ce_top1_is_s2top1",
+        "ce_s2_top1_agree",
+        "ce_margin_minus_s2",
+        "ce_minus_s2top1",
+    ],
+    "int": [
+        "ce_p",
+        "ce_x_ntset",
+        "ce_x_atset",
+        "ce_x_cmatch",
+        "ce_x_house",
+        "ce_x_numjacc",
+        "ce_x_prr",
+        "ce_x_s2rank",
+        "ce_x_ln",
+        "ce_x_aempty",
+        "ce_x_chain",
+        "ce_x_src",
+    ],
 }
-CEX_FAMILIES["all"] = list(dict.fromkeys(c for f in ("raw", "rank", "list", "dis", "int") for c in CEX_FAMILIES[f]))
+CEX_FAMILIES["all"] = list(
+    dict.fromkeys(c for f in ("raw", "rank", "list", "dis", "int") for c in CEX_FAMILIES[f])
+)
 _CEX_CACHE = {}
 
 
@@ -421,8 +713,12 @@ def cex_table(ce_name, set_name, X, s1, pool):
         raise RuntimeError(f"{ce_name}/{set_name}: {int(np.isnan(p).sum())} rows without p_ce")
     pc = np.clip(p, 1e-6, 1 - 1e-6)
     logit = np.log(pc / (1 - pc))
-    c = {"ce_p": p, "ce_logit": logit,
-         "ce_entropy": -(pc * np.log(pc) + (1 - pc) * np.log(1 - pc)), "ce_conf": np.abs(p - 0.5) * 2}
+    c = {
+        "ce_p": p,
+        "ce_logit": logit,
+        "ce_entropy": -(pc * np.log(pc) + (1 - pc) * np.log(1 - pc)),
+        "ce_conf": np.abs(p - 0.5) * 2,
+    }
 
     # sorted view: S1 ascending, p descending; position 0 = CE top1 of the list
     order = np.lexsort((-p, s1))
@@ -440,8 +736,11 @@ def cex_table(ce_name, set_name, X, s1, pool):
         idx = gs + k
         v = np.where(k < gn, ps[np.minimum(idx, ss.size - 1)], np.nan)
         return v[gid][inv]
+
     t1, t2, t3 = at(0), at(1), at(2)
-    nxt = np.where(pos < gn[gid] - 1, ps[np.minimum(np.arange(ss.size) + 1, ss.size - 1)], np.nan)[inv]
+    nxt = np.where(pos < gn[gid] - 1, ps[np.minimum(np.arange(ss.size) + 1, ss.size - 1)], np.nan)[
+        inv
+    ]
     prv = np.where(pos > 0, ps[np.maximum(np.arange(ss.size) - 1, 0)], np.nan)[inv]
     n = n[inv]
 
@@ -451,25 +750,41 @@ def cex_table(ce_name, set_name, X, s1, pool):
     rank_max = g["p"].rank(ascending=False, method="max").to_numpy()
     mean, std = g["p"].transform("mean").to_numpy(), g["p"].transform("std", ddof=0).to_numpy()
     soft = df["e"].to_numpy() / g["e"].transform("sum").to_numpy()
-    df["soft2"] = soft ** 2
+    df["soft2"] = soft**2
     q = p / np.maximum(g["p"].transform("sum").to_numpy(), 1e-12)
     df["qlq"] = -q * np.log(np.maximum(q, 1e-12))
     g = df.groupby("s", sort=False)
     multi = n >= 2
-    c.update({
-        "ce_rank": rank, "ce_rank_pct": np.where(multi, (rank - 1) / np.maximum(n - 1, 1), np.nan),
-        "ce_top1": (rank <= 1).astype(np.float64), "ce_top2": (rank <= 2).astype(np.float64),
-        "ce_top3": (rank <= 3).astype(np.float64),
-        "ce_gap_top1": t1 - p, "ce_gap_next": p - nxt, "ce_gap_prev": prv - p,
-        "ce_t1_t2": t1 - t2, "ce_t2_t3": t2 - t3, "ce_t1_t3": t1 - t3,
-        "ce_l_mean": mean, "ce_l_std": std, "ce_l_max": t1, "ce_l_min": g["p"].transform("min").to_numpy(),
-        "ce_z": np.where(multi & (std > 1e-9), (p - mean) / np.where(std > 1e-9, std, 1), np.nan),
-        "ce_pctile": np.where(multi, (n - rank_max) / np.maximum(n - 1, 1), np.nan),
-        "ce_softmax": soft, "ce_ratio_max": p / np.maximum(t1, 1e-12),
-        "ce_frac_above": (rank - 1) / n,
-        "ce_l_entropy": np.where(multi, g["qlq"].transform("sum").to_numpy() / np.log(np.maximum(n, 2)), np.nan),
-        "ce_softmax_hhi": g["soft2"].transform("sum").to_numpy(),
-    })
+    c.update(
+        {
+            "ce_rank": rank,
+            "ce_rank_pct": np.where(multi, (rank - 1) / np.maximum(n - 1, 1), np.nan),
+            "ce_top1": (rank <= 1).astype(np.float64),
+            "ce_top2": (rank <= 2).astype(np.float64),
+            "ce_top3": (rank <= 3).astype(np.float64),
+            "ce_gap_top1": t1 - p,
+            "ce_gap_next": p - nxt,
+            "ce_gap_prev": prv - p,
+            "ce_t1_t2": t1 - t2,
+            "ce_t2_t3": t2 - t3,
+            "ce_t1_t3": t1 - t3,
+            "ce_l_mean": mean,
+            "ce_l_std": std,
+            "ce_l_max": t1,
+            "ce_l_min": g["p"].transform("min").to_numpy(),
+            "ce_z": np.where(
+                multi & (std > 1e-9), (p - mean) / np.where(std > 1e-9, std, 1), np.nan
+            ),
+            "ce_pctile": np.where(multi, (n - rank_max) / np.maximum(n - 1, 1), np.nan),
+            "ce_softmax": soft,
+            "ce_ratio_max": p / np.maximum(t1, 1e-12),
+            "ce_frac_above": (rank - 1) / n,
+            "ce_l_entropy": np.where(
+                multi, g["qlq"].transform("sum").to_numpy() / np.log(np.maximum(n, 2)), np.nan
+            ),
+            "ce_softmax_hhi": g["soft2"].transform("sum").to_numpy(),
+        }
+    )
     for thr, name in ((0.5, "05"), (0.7, "07"), (0.8, "08"), (0.9, "09")):
         df["b"] = (p >= thr).astype(np.float64)
         c[f"ce_n_ge{name}"] = df.groupby("s", sort=False)["b"].transform("sum").to_numpy()
@@ -479,7 +794,9 @@ def cex_table(ce_name, set_name, X, s1, pool):
     df["sp"] = np.where(same, p, np.nan)
     gsn = df.groupby("s", sort=False)["sp"]
     c["ce_samename_n"] = gsn.transform("count").to_numpy().astype(np.float64)
-    c["ce_samename_rank"] = np.where(same, gsn.rank(ascending=False, method="min").to_numpy(), np.nan)
+    c["ce_samename_rank"] = np.where(
+        same, gsn.rank(ascending=False, method="min").to_numpy(), np.nan
+    )
 
     # disagreement with stage 2 (p_rerank, its list rank)
     prr, s2rank = _col(X, "p_rerank"), _col(X, "rank")
@@ -490,41 +807,83 @@ def cex_table(ce_name, set_name, X, s1, pool):
     ce_at_s2top = g["ce_at_s2top"].transform("max").to_numpy()
     prr_rank = g["prr"].rank(ascending=False, method="first").to_numpy()
     df["prr2"] = np.where(prr_rank == 2, prr, np.nan)
-    s2_margin = g["prr"].transform("max").to_numpy() - df.groupby("s", sort=False)["prr2"].transform("max").to_numpy()
-    c.update({
-        "ce_minus_prr": p - prr, "ce_abs_prr": np.abs(p - prr), "ce_rank_minus_s2": rank - s2rank,
-        "ce_top1_is_s2top1": ((rank <= 1) & s2_top).astype(np.float64),
-        "ce_s2_top1_agree": (np.abs(ce_at_s2top - t1) < 1e-12).astype(np.float64),
-        "ce_margin_minus_s2": (t1 - t2) - s2_margin,
-        "ce_minus_s2top1": p - ce_at_s2top,
-    })
+    s2_margin = (
+        g["prr"].transform("max").to_numpy()
+        - df.groupby("s", sort=False)["prr2"].transform("max").to_numpy()
+    )
+    c.update(
+        {
+            "ce_minus_prr": p - prr,
+            "ce_abs_prr": np.abs(p - prr),
+            "ce_rank_minus_s2": rank - s2rank,
+            "ce_top1_is_s2top1": ((rank <= 1) & s2_top).astype(np.float64),
+            "ce_s2_top1_agree": (np.abs(ce_at_s2top - t1) < 1e-12).astype(np.float64),
+            "ce_margin_minus_s2": (t1 - t2) - s2_margin,
+            "ce_minus_s2top1": p - ce_at_s2top,
+        }
+    )
 
     # products with one evidence column each; binary/categorical columns as indicators, not codes
     col = lambda f: np.nan_to_num(_col(X, f), nan=-1.0)
-    c.update({
-        "ce_x_ntset": p * _col(X, "n_tset"), "ce_x_atset": p * _col(X, "a_tset"),
-        "ce_x_cmatch": p * (col("country3") == 1), "ce_x_house": p * _col(X, "a_house"),
-        "ce_x_numjacc": p * _col(X, "a_num_jacc"), "ce_x_prr": p * prr, "ce_x_s2rank": p / np.maximum(s2rank, 1),
-        "ce_x_ln": p * _col(X, "l_n"), "ce_x_aempty": p * (col("a_empty") == 1), "ce_x_chain": p * _col(X, "log_chain"),
-        "ce_x_src": p * (col("src") == 3),
-    })
+    c.update(
+        {
+            "ce_x_ntset": p * _col(X, "n_tset"),
+            "ce_x_atset": p * _col(X, "a_tset"),
+            "ce_x_cmatch": p * (col("country3") == 1),
+            "ce_x_house": p * _col(X, "a_house"),
+            "ce_x_numjacc": p * _col(X, "a_num_jacc"),
+            "ce_x_prr": p * prr,
+            "ce_x_s2rank": p / np.maximum(s2rank, 1),
+            "ce_x_ln": p * _col(X, "l_n"),
+            "ce_x_aempty": p * (col("a_empty") == 1),
+            "ce_x_chain": p * _col(X, "log_chain"),
+            "ce_x_src": p * (col("src") == 3),
+        }
+    )
     _CEX_CACHE[key] = c
     return c
 
 
 def group_spec(name):
-    """(columns, fn) of a feature group; 'ce:<name>' is a cross-encoder score group and 'cex_<family>:<name>' a
-    CE-derived family (neither cached: the score file is the cache, and a re-scored file must not be shadowed
-    by an old copy)."""
+    """(columns, fn) of a feature group; 'ce:<name>' is a cross-encoder score group, 'cex_<family>:<name>'
+    a CE-derived family, 'nn:<run>' an NN listwise score group (mirrors 'ce:'), and 'nndis:<nn>:<gbm>' the
+    NN-vs-GBM disagreement family (neither cached: the score file is the cache, and a re-scored file must
+    not be shadowed by an old copy)."""
     if name.startswith("ce:"):
         ce = name[3:]
-        return ([f"p_{ce}", f"p_{ce}_rank", f"p_{ce}_gap"],
-                lambda set_name, X, s1, pool: group_ce(ce, set_name, s1, pool))
+        return (
+            [f"p_{ce}", f"p_{ce}_rank", f"p_{ce}_gap"],
+            lambda set_name, X, s1, pool: group_ce(ce, set_name, s1, pool),
+        )
+    if name.startswith("nn:"):
+        run = name[3:]
+        return (
+            [f"p_{run}", f"p_{run}_rank", f"p_{run}_gap"],
+            lambda set_name, X, s1, pool: group_nn(run, set_name, s1, pool),
+        )
+    if name.startswith("nndis:"):
+        nn_run, gbm_run = name[len("nndis:") :].split(":")
+        cols = [
+            "nnd_minus",
+            "nnd_abs",
+            "nnd_rank_minus",
+            "nnd_top1_agree",
+            "nnd_margin_minus",
+            "nnd_minus_gbmtop1",
+        ]
+        return (
+            list(cols),
+            lambda set_name, X, s1, pool: group_nndis(nn_run, gbm_run, set_name, s1, pool),
+        )
     if name.startswith("cex_"):
         fam, ce = name[4:].split(":")
         cols = CEX_FAMILIES[fam]
-        return (list(cols), lambda set_name, X, s1, pool:
-                np.column_stack([cex_table(ce, set_name, X, s1, pool)[k] for k in cols]))
+        return (
+            list(cols),
+            lambda set_name, X, s1, pool: np.column_stack(
+                [cex_table(ce, set_name, X, s1, pool)[k] for k in cols]
+            ),
+        )
     return GROUPS[name]
 
 
@@ -535,13 +894,17 @@ def group_path(set_name, name):
 def load_group(set_name, name, X, s1, pool, lg=None):
     """Group columns for the feature rows (cached per set; the cache stores s1/pool to verify row order)."""
     cols, fn = group_spec(name)
-    if name.startswith(("ce:", "cex_")) or name in ("rev", "grp", "grp_full"):
+    if name.startswith(("ce:", "cex_", "nn:", "nndis:")) or name in ("rev", "grp", "grp_full"):
         return fn(set_name, X, s1, pool).astype(np.float32)
     path = group_path(set_name, name)
     if path.exists():
         t = pq.read_table(path)
-        if (t.num_rows == s1.size and np.array_equal(t.column("s1_idx").to_numpy(), s1)
-                and np.array_equal(t.column("pool_idx").to_numpy(), pool) and t.column_names[2:] == cols):
+        if (
+            t.num_rows == s1.size
+            and np.array_equal(t.column("s1_idx").to_numpy(), s1)
+            and np.array_equal(t.column("pool_idx").to_numpy(), pool)
+            and t.column_names[2:] == cols
+        ):
             return np.column_stack([t.column(c).to_numpy() for c in cols]).astype(np.float32)
     t0 = time.time()
     G = fn(set_name, X, s1, pool)
@@ -569,6 +932,7 @@ def full_matrix(set_name, groups, fingerprint, lg=None):
 
 # ---------------------------------------------------------------- sample weights
 
+
 def sample_weights(spec, Xf, names, s1):
     """Label-free weights (features only). Normalised to mean 1."""
     if not spec:
@@ -585,8 +949,9 @@ def sample_weights(spec, Xf, names, s1):
         # On MATCH_TRAIN this marks 18.5% of rows and 58% of the reference run's uncertain-band rows.
         nt, at = Xf[:, col["n_tset"]], Xf[:, col["a_tset"]]
         gap, prr = np.abs(Xf[:, col["l_p_gap_next"]]), Xf[:, col["p_rerank"]]
-        hard = ((nt >= spec.get("name_min", 0.9)) & ~(at >= spec.get("addr_max", 0.6))) | \
-               ((gap < spec.get("gap", 0.1)) & (prr >= 0.05) & (prr <= 0.95))
+        hard = ((nt >= spec.get("name_min", 0.9)) & ~(at >= spec.get("addr_max", 0.6))) | (
+            (gap < spec.get("gap", 0.1)) & (prr >= 0.05) & (prr <= 0.95)
+        )
         w = np.where(hard, spec.get("alpha", 2.0), 1.0)
     else:
         raise ValueError(f"unknown weight kind {kind!r}")
@@ -600,14 +965,19 @@ def sample_weights(spec, Xf, names, s1):
 SPECIALISTS = {
     "name": lambda f: f.startswith("n_") or f in ("q_ntok", "p_ntok", "q_name_cnt", "p_name_cnt"),
     "addr": lambda f: f.startswith("a_") or f in ("q_addr_cnt", "p_addr_cnt"),
-    "ctx": lambda f: f in ("p_rerank", "rank", "src", "country3", "pool_indic", "log_chain") or f.startswith("l_"),
+    "ctx": lambda f: f in ("p_rerank", "rank", "src", "country3", "pool_indic", "log_chain")
+    or f.startswith("l_"),
 }
 
 
 # Fellegi-Sunter m/u evidence (item 12): agreement pattern = binned name token-set x address token-set x
 # address-number Jaccard; weight = log P(pattern | match) / P(pattern | non-match), Laplace-smoothed, fitted on
 # the fold's fit rows only (test time: on all MATCH_TRAIN rows).
-_MU_BINS = {"n_tset": [0.5, 0.7, 0.85, 0.95], "a_tset": [0.5, 0.7, 0.85, 0.95], "a_num_jacc": [1e-9, 1.0 - 1e-9]}
+_MU_BINS = {
+    "n_tset": [0.5, 0.7, 0.85, 0.95],
+    "a_tset": [0.5, 0.7, 0.85, 0.95],
+    "a_num_jacc": [1e-9, 1.0 - 1e-9],
+}
 
 
 def mu_pattern(cols):
@@ -623,15 +993,20 @@ def mu_table(code, y):
     n_cells = int(np.prod([len(e) + 2 for e in _MU_BINS.values()]))
     c1 = np.bincount(code[y], minlength=n_cells).astype(np.float64)
     c0 = np.bincount(code[~y], minlength=n_cells).astype(np.float64)
-    return (np.log((c1 + 1) / (c1.sum() + n_cells)) - np.log((c0 + 1) / (c0.sum() + n_cells))).tolist()
+    return (
+        np.log((c1 + 1) / (c1.sum() + n_cells)) - np.log((c0 + 1) / (c0.sum() + n_cells))
+    ).tolist()
 
 
 def _folds(y, s1, mcfg):
     from sklearn.model_selection import GroupKFold, GroupShuffleSplit
+
     gkf = GroupKFold(n_splits=mcfg["n_folds"], shuffle=True, random_state=mcfg["fold_seed"])
     out = []
     for k, (tr, te) in enumerate(gkf.split(np.zeros(y.size), y, s1)):
-        gss = GroupShuffleSplit(n_splits=1, test_size=mcfg["early_stop_frac"], random_state=mcfg["fold_seed"] + k)
+        gss = GroupShuffleSplit(
+            n_splits=1, test_size=mcfg["early_stop_frac"], random_state=mcfg["fold_seed"] + k
+        )
         fit_i, es_i = next(gss.split(tr, groups=s1[tr]))
         out.append((k, tr, te, tr[fit_i], tr[es_i]))
     return out
@@ -639,12 +1014,24 @@ def _folds(y, s1, mcfg):
 
 def _train_one(params, n_round, esr, X, y, w, feats, fit_i, es_i):
     import lightgbm as lgb
-    dfit = lgb.Dataset(X[fit_i], label=y[fit_i], weight=None if w is None else w[fit_i], feature_name=feats,
-                       free_raw_data=False)
+
+    dfit = lgb.Dataset(
+        X[fit_i],
+        label=y[fit_i],
+        weight=None if w is None else w[fit_i],
+        feature_name=feats,
+        free_raw_data=False,
+    )
     # early stopping on UNWEIGHTED logloss: the stopping rule should not depend on the weighting
     des = lgb.Dataset(X[es_i], label=y[es_i], reference=dfit, free_raw_data=False)
-    return lgb.train(params, dfit, num_boost_round=n_round, valid_sets=[des], valid_names=["early_stop"],
-                     callbacks=[lgb.early_stopping(esr, verbose=False), lgb.log_evaluation(period=0)])
+    return lgb.train(
+        params,
+        dfit,
+        num_boost_round=n_round,
+        valid_sets=[des],
+        valid_names=["early_stop"],
+        callbacks=[lgb.early_stopping(esr, verbose=False), lgb.log_evaluation(period=0)],
+    )
 
 
 def _model_name(prefix, k, j, n_seeds, part):
@@ -695,17 +1082,35 @@ def run_exp_train(args):
     def log_fold(tag, k, seed, b, cap=None):
         cap = cap or n_round
         truncated = b.best_iteration >= cap - esr
-        folds.append({"model": tag, "fold": k, "seed": seed, "best_iteration": int(b.best_iteration),
-                      "cap": cap, "truncated": bool(truncated),
-                      "early_stop_logloss": float(b.best_score["early_stop"]["binary_logloss"])})
-        lg.info("%s fold %d seed %d: best_iteration %d/%d%s (%.0fs)", tag, k, seed, b.best_iteration, cap,
-                " TRUNCATED" if truncated else "", time.time() - t0)
+        folds.append(
+            {
+                "model": tag,
+                "fold": k,
+                "seed": seed,
+                "best_iteration": int(b.best_iteration),
+                "cap": cap,
+                "truncated": bool(truncated),
+                "early_stop_logloss": float(b.best_score["early_stop"]["binary_logloss"]),
+            }
+        )
+        lg.info(
+            "%s fold %d seed %d: best_iteration %d/%d%s (%.0fs)",
+            tag,
+            k,
+            seed,
+            b.best_iteration,
+            cap,
+            " TRUNCATED" if truncated else "",
+            time.time() - t0,
+        )
 
     # ---- stacked specialists (OOF over the same folds; test time = fold average)
     stack = {}
     if spec.get("specialists"):
         cols_sp, S = {}, []
-        sp_round = int(spec.get("spec_num_boost_round", n_round))  # weaker feature sets need more rounds (M011)
+        sp_round = int(
+            spec.get("spec_num_boost_round", n_round)
+        )  # weaker feature sets need more rounds (M011)
         for sname in spec["specialists"]:
             cols = [f for f in feats if SPECIALISTS[sname](f)]
             cols_sp[sname] = cols
@@ -715,13 +1120,17 @@ def run_exp_train(args):
             for k, tr, te, fit_i, es_i in folds_idx:
                 b = _train_one(p, sp_round, esr, Xs, y, None, cols, fit_i, es_i)
                 o[te] = b.predict(Xs[te], num_iteration=b.best_iteration)
-                b.save_model(str(rd / "models" / f"spec_{sname}_fold{k}.txt"), num_iteration=b.best_iteration)
+                b.save_model(
+                    str(rd / "models" / f"spec_{sname}_fold{k}.txt"), num_iteration=b.best_iteration
+                )
                 log_fold(f"spec_{sname}", k, 42, b, cap=sp_round)
             S.append(o)
         S = np.column_stack(S)
         sp_names = [f"sp_{s}" for s in spec["specialists"]]
         if "name" in spec["specialists"] and "addr" in spec["specialists"]:
-            S = np.column_stack([S, S[:, sp_names.index("sp_name")] - S[:, sp_names.index("sp_addr")]])
+            S = np.column_stack(
+                [S, S[:, sp_names.index("sp_name")] - S[:, sp_names.index("sp_addr")]]
+            )
             sp_names.append("sp_name_minus_addr")
         X = np.hstack([X, S.astype(np.float32)])
         feats = feats + sp_names
@@ -735,9 +1144,15 @@ def run_exp_train(args):
         t = pq.read_table(match.runs_dir(par) / "oof.parquet").to_pandas()
         if rows is not None:
             t = t.iloc[rows].reset_index(drop=True)
-        if not (np.array_equal(t["s1_idx"].to_numpy(), s1) and np.array_equal(t["pool_idx"].to_numpy(), pool)):
+        if not (
+            np.array_equal(t["s1_idx"].to_numpy(), s1)
+            and np.array_equal(t["pool_idx"].to_numpy(), pool)
+        ):
             raise RuntimeError(f"{par} OOF rows differ from MATCH_TRAIN feature rows")
-        par_raw, par_cal = t["p_raw"].to_numpy().astype(np.float64), t["p_cal"].to_numpy().astype(np.float64)
+        par_raw, par_cal = (
+            t["p_raw"].to_numpy().astype(np.float64),
+            t["p_cal"].to_numpy().astype(np.float64),
+        )
         train_mask = (par_cal >= BAND[0]) & (par_cal < BAND[1])
         X = np.hstack([X, par_raw[:, None].astype(np.float32)])
         feats = feats + ["par_p"]
@@ -760,9 +1175,21 @@ def run_exp_train(args):
             raise RuntimeError(f"split_by {split_by} has NaN values")
     oof = np.zeros(y.size)
     gain = np.zeros(len(feats))
-    lg.info("exp %s: %d rows (%d trainable), %d features, groups %s, weights %s, seeds %s, specialists %s, "
-            "residual_of %s, split_by %s, cap %d", run, y.size, int(train_mask.sum()), len(feats), groups,
-            spec.get("weights"), seeds, spec.get("specialists"), spec.get("residual_of"), split_by, n_round)
+    lg.info(
+        "exp %s: %d rows (%d trainable), %d features, groups %s, weights %s, seeds %s, specialists %s, "
+        "residual_of %s, split_by %s, cap %d",
+        run,
+        y.size,
+        int(train_mask.sum()),
+        len(feats),
+        groups,
+        spec.get("weights"),
+        seeds,
+        spec.get("specialists"),
+        spec.get("residual_of"),
+        split_by,
+        n_round,
+    )
     for k, tr, te, fit_i, es_i in folds_idx:
         if mu_code is not None:
             X[:, -1] = np.asarray(mu_table(mu_code[fit_i], y[fit_i]), dtype=np.float32)[mu_code]
@@ -772,14 +1199,22 @@ def run_exp_train(args):
             for j, seed in enumerate(seeds):
                 b = _train_one(dict(params, seed=seed), n_round, esr, X, y, w, feats, f_i, e_i)
                 oof[t_i] += b.predict(X[t_i], num_iteration=b.best_iteration) / len(seeds)
-                b.save_model(str(rd / "models" / _model_name("model", k, j, len(seeds), part)),
-                             num_iteration=b.best_iteration)
-                gain += b.feature_importance("gain", iteration=b.best_iteration) / len(seeds) / len(part_vals)
+                b.save_model(
+                    str(rd / "models" / _model_name("model", k, j, len(seeds), part)),
+                    num_iteration=b.best_iteration,
+                )
+                gain += (
+                    b.feature_importance("gain", iteration=b.best_iteration)
+                    / len(seeds)
+                    / len(part_vals)
+                )
                 log_fold("main" if part is None else f"main_part{int(part)}", k, seed, b)
 
     if residual:
         # band rows: residual model calibrated on the band; other rows keep the parent's calibrated p
-        iso = IsotonicRegression(y_min=0.0, y_max=1.0, out_of_bounds="clip").fit(oof[train_mask], y[train_mask])
+        iso = IsotonicRegression(y_min=0.0, y_max=1.0, out_of_bounds="clip").fit(
+            oof[train_mask], y[train_mask]
+        )
         calib = {"x": iso.X_thresholds_.tolist(), "y": iso.y_thresholds_.tolist()}
         p_cal = par_cal.astype(np.float32).copy()
         p_cal[train_mask] = match.calibrate(oof[train_mask], calib)
@@ -788,34 +1223,90 @@ def run_exp_train(args):
         iso = IsotonicRegression(y_min=0.0, y_max=1.0, out_of_bounds="clip").fit(oof, y)
         calib = {"x": iso.X_thresholds_.tolist(), "y": iso.y_thresholds_.tolist()}
         p_cal = match.calibrate(oof, calib)
-    decision, per_entity, report, rule_scores, sweep = choose_decision(queries, s1, pool, y, p_cal, mcfg)
+    decision, per_entity, report, rule_scores, sweep = choose_decision(
+        queries, s1, pool, y, p_cal, mcfg
+    )
 
-    doc = {"features": match.FEATURES, "extra_groups": groups, "feature_names": names, "features_used": feats,
-           "n_folds": mcfg["n_folds"], "n_seeds": len(seeds), "bucketing_fingerprint": fp, "run": run,
-           "train_set": "MATCH_TRAIN", "train_limited": rows is not None, "calibration": calib, "decision": decision,
-           "floor_threshold": None, "oof_f05": report["f05"], "weights": spec.get("weights"),
-           "stack": stack, "residual": residual, "split_by": split_by, "part_vals": part_vals, "mu_table": mu_full,
-           "best_iteration": [f["best_iteration"] for f in folds], "num_boost_round": n_round,
-           "truncated": any(f["truncated"] for f in folds), "exp": spec,
-           "created_at": time.strftime("%Y-%m-%dT%H:%M:%S%z")}
+    doc = {
+        "features": match.FEATURES,
+        "extra_groups": groups,
+        "feature_names": names,
+        "features_used": feats,
+        "n_folds": mcfg["n_folds"],
+        "n_seeds": len(seeds),
+        "bucketing_fingerprint": fp,
+        "run": run,
+        "train_set": "MATCH_TRAIN",
+        "train_limited": rows is not None,
+        "calibration": calib,
+        "decision": decision,
+        "floor_threshold": None,
+        "oof_f05": report["f05"],
+        "weights": spec.get("weights"),
+        "stack": stack,
+        "residual": residual,
+        "split_by": split_by,
+        "part_vals": part_vals,
+        "mu_table": mu_full,
+        "best_iteration": [f["best_iteration"] for f in folds],
+        "num_boost_round": n_round,
+        "truncated": any(f["truncated"] for f in folds),
+        "exp": spec,
+        "created_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+    }
     io_utils.atomic_write_json(rd / "models" / "matcher.json", doc)
     np.save(rd / "queries.npy", queries)
     np.save(rd / "OOF_per_entity.npy", per_entity)
-    pq.write_table(pa.table({"s1_idx": s1, "pool_idx": pool, "y": y, "p_raw": oof.astype(np.float32),
-                             "p_cal": p_cal}), rd / "oof.parquet", compression="zstd")
+    pq.write_table(
+        pa.table(
+            {
+                "s1_idx": s1,
+                "pool_idx": pool,
+                "y": y,
+                "p_raw": oof.astype(np.float32),
+                "p_cal": p_cal,
+            }
+        ),
+        rd / "oof.parquet",
+        compression="zstd",
+    )
 
-    payload = {"run": run, "exp": spec, "n_rows": int(y.size), "features_used": feats, "folds": folds,
-               "any_fold_truncated": doc["truncated"], "decision": decision, "oof": report,
-               "oof_rule_scores": rule_scores, "oof_threshold_sweep": sweep,
-               "calibration_reliability": match.reliability(p_cal, y),
-               "feature_gain": dict(sorted(((f, float(g / mcfg["n_folds"])) for f, g in zip(feats, gain)),
-                                           key=lambda kv: -kv[1])),
-               "vs_parent": {} if rows is not None else compare_to_parent(spec.get("parent"), queries, per_entity),
-               "wall_s": round(time.time() - t0, 1)}
-    io_utils.write_metrics(f"exp_{run}", payload, queries.size, int(match.true_counts(queries).sum()), cfg)
+    payload = {
+        "run": run,
+        "exp": spec,
+        "n_rows": int(y.size),
+        "features_used": feats,
+        "folds": folds,
+        "any_fold_truncated": doc["truncated"],
+        "decision": decision,
+        "oof": report,
+        "oof_rule_scores": rule_scores,
+        "oof_threshold_sweep": sweep,
+        "calibration_reliability": match.reliability(p_cal, y),
+        "feature_gain": dict(
+            sorted(
+                ((f, float(g / mcfg["n_folds"])) for f, g in zip(feats, gain)),
+                key=lambda kv: -kv[1],
+            )
+        ),
+        "vs_parent": {}
+        if rows is not None
+        else compare_to_parent(spec.get("parent"), queries, per_entity),
+        "wall_s": round(time.time() - t0, 1),
+    }
+    io_utils.write_metrics(
+        f"exp_{run}", payload, queries.size, int(match.true_counts(queries).sum()), cfg
+    )
     vp = payload["vs_parent"]
-    lg.info("exp %s: OOF F0.5 %.5f; vs %s: %s; band %s; truncated folds %d", run, report["f05"],
-            spec.get("parent"), vp.get("all"), vp.get("band_s1"), sum(f["truncated"] for f in folds))
+    lg.info(
+        "exp %s: OOF F0.5 %.5f; vs %s: %s; band %s; truncated folds %d",
+        run,
+        report["f05"],
+        spec.get("parent"),
+        vp.get("all"),
+        vp.get("band_s1"),
+        sum(f["truncated"] for f in folds),
+    )
 
 
 def choose_decision(queries, s1, pool, y, p_cal, mcfg):
@@ -829,10 +1320,15 @@ def choose_decision(queries, s1, pool, y, p_cal, mcfg):
         pc = match.one_owner(pool, p_cal) if owner else p_cal
         sw = {float(t): scorer.f05(pc >= t) for t in grid}
         tb = max(sw, key=sw.get)
-        for rule, dec in (("threshold", {"rule": "threshold", "threshold": tb, "one_owner": owner}),
-                          ("expected_f", {"rule": "expected_f", "threshold": None, "one_owner": owner})):
-            cands[(rule, owner)] = (dec, scorer.per_entity(match.apply_decision(dec, s1, pool, p_cal))[0],
-                                    sw if rule == "threshold" else None)
+        for rule, dec in (
+            ("threshold", {"rule": "threshold", "threshold": tb, "one_owner": owner}),
+            ("expected_f", {"rule": "expected_f", "threshold": None, "one_owner": owner}),
+        ):
+            cands[(rule, owner)] = (
+                dec,
+                scorer.per_entity(match.apply_decision(dec, s1, pool, p_cal))[0],
+                sw if rule == "threshold" else None,
+            )
     ef = match.paired_delta(cands[("expected_f", False)][1], cands[("threshold", False)][1])
     base = "expected_f" if match.adopt(ef, dcfg["expected_f_min_gain"]) else "threshold"
     oo = match.paired_delta(cands[(base, True)][1], cands[(base, False)][1])
@@ -846,8 +1342,12 @@ def choose_decision(queries, s1, pool, y, p_cal, mcfg):
 
 def band_mask(queries, ref_run="x1_strsim"):
     """S1 of MATCH_TRAIN with >= 1 candidate whose calibrated OOF p (reference run) is in the uncertain band.
-    Fixed across experiments so every run is compared on the same S1."""
-    t = pq.read_table(match.runs_dir(ref_run) / "oof.parquet", columns=["s1_idx", "p_cal"])
+    Fixed across experiments so every run is compared on the same S1. None when the reference run's OOF
+    is absent on this machine (the band split is then skipped, not faked)."""
+    path = match.runs_dir(ref_run) / "oof.parquet"
+    if not path.exists():
+        return None
+    t = pq.read_table(path, columns=["s1_idx", "p_cal"])
     s, p = t.column("s1_idx").to_numpy(), t.column("p_cal").to_numpy()
     inb = s[(p >= BAND[0]) & (p < BAND[1])]
     return np.isin(queries, inb)
@@ -861,23 +1361,42 @@ def compare_to_parent(parent, queries, per_entity):
     if not np.array_equal(np.load(rd / "queries.npy"), queries):
         raise RuntimeError(f"parent {parent} was scored on different queries")
     from ber.evaluate import segment_data
+
     masks = dict(segment_data(queries, np.zeros(0, dtype=np.uint32))["query"])
     masks["singleton"] = match.true_counts(queries) == 0
     band = band_mask(queries)
-    out = {"parent": parent, "f05_parent": float(fa.mean()), "f05_new": float(per_entity.mean()),
-           "all": match.paired_delta(per_entity, fa, n_boot=2000),
-           "band_s1": dict(match.paired_delta(per_entity[band], fa[band], n_boot=1000),
-                           share=float(band.mean()), f05_parent=float(fa[band].mean())),
-           "non_band_s1": match.paired_delta(per_entity[~band], fa[~band], n_boot=1000),
-           "segments": {k: dict(match.paired_delta(per_entity[m], fa[m], n_boot=500), f05_parent=float(fa[m].mean()))
-                        for k, m in masks.items() if m.any()}}
+    out = {
+        "parent": parent,
+        "f05_parent": float(fa.mean()),
+        "f05_new": float(per_entity.mean()),
+        "all": match.paired_delta(per_entity, fa, n_boot=2000),
+        "band_s1": None
+        if band is None
+        else dict(
+            match.paired_delta(per_entity[band], fa[band], n_boot=1000),
+            share=float(band.mean()),
+            f05_parent=float(fa[band].mean()),
+        ),
+        "non_band_s1": None
+        if band is None
+        else match.paired_delta(per_entity[~band], fa[~band], n_boot=1000),
+        "segments": {
+            k: dict(
+                match.paired_delta(per_entity[m], fa[m], n_boot=500), f05_parent=float(fa[m].mean())
+            )
+            for k, m in masks.items()
+            if m.any()
+        },
+    }
     return out
 
 
 # ---------------------------------------------------------------- predict
 
+
 def _avg_predict(files, X):
     import lightgbm as lgb
+
     if not files:
         raise RuntimeError("no model files")
     p = np.zeros(X.shape[0])
@@ -889,7 +1408,9 @@ def _avg_predict(files, X):
 def predict_run(set_name, doc, models_dir, lg=None):
     """(Xf, names, s1, pool, meta, p_cal, p_raw) for every feature row of a set with the run's models:
     fold (and seed) average, specialists stacked, split_by routing, residual band on top of the parent."""
-    Xf, names, s1, pool, meta = full_matrix(set_name, doc.get("extra_groups", []), doc["bucketing_fingerprint"], lg)
+    Xf, names, s1, pool, meta = full_matrix(
+        set_name, doc.get("extra_groups", []), doc["bucketing_fingerprint"], lg
+    )
     if names != doc.get("feature_names", names):
         raise RuntimeError("feature/group columns differ from the run's")
     ci = {n: i for i, n in enumerate(names)}
@@ -915,7 +1436,9 @@ def predict_run(set_name, doc, models_dir, lg=None):
         cols["par_p"] = par_raw
         band = (par_cal >= residual["band"][0]) & (par_cal < residual["band"][1])
     if doc.get("mu_table"):
-        cols["mu_llr"] = np.asarray(doc["mu_table"])[mu_pattern({f: Xf[:, ci[f]] for f in _MU_BINS})]
+        cols["mu_llr"] = np.asarray(doc["mu_table"])[
+            mu_pattern({f: Xf[:, ci[f]] for f in _MU_BINS})
+        ]
     X = np.column_stack([cols[f] for f in doc["features_used"]]).astype(np.float32)
     n_seeds = doc.get("n_seeds", 1)
     raw = np.zeros(X.shape[0])
@@ -931,7 +1454,9 @@ def predict_run(set_name, doc, models_dir, lg=None):
                 raw[m] = _avg_predict(files, X[m])
         unseen = ~np.isin(pv, doc["part_vals"])
         if unseen.any():
-            raise RuntimeError(f"{int(unseen.sum())} rows have a {split_by} value unseen in training")
+            raise RuntimeError(
+                f"{int(unseen.sum())} rows have a {split_by} value unseen in training"
+            )
     else:
         files = sorted(models_dir.glob("model_fold*.txt"))
         if len(files) != doc["n_folds"] * n_seeds:
@@ -939,8 +1464,11 @@ def predict_run(set_name, doc, models_dir, lg=None):
         m = band if band is not None else np.ones(X.shape[0], bool)
         raw[m] = _avg_predict(files, X[m])
         blend = doc.get("xgb_blend")
-        if blend:  # (1 - w) * LightGBM average + w * XGBoost average (plan/checks/train_xgb_blend.py)
+        if (
+            blend
+        ):  # (1 - w) * LightGBM average + w * XGBoost average (plan/checks/train_xgb_blend.py)
             import xgboost as xgb
+
             dm = xgb.DMatrix(X[m], feature_names=list(doc["features_used"]))
             px = np.zeros(int(m.sum()))
             for f in blend["files"]:
@@ -966,13 +1494,18 @@ def run_exp_predict(args):
         raise RuntimeError("bucketing fingerprint changed since this run was trained")
     if doc.get("train_limited"):
         raise RuntimeError("smoke run (smoke_s1): not a submittable model")
-    io_utils.log_test_usage(f"exp-predict {args.run}: matcher inference over test candidates (inputs only)",
-                            "submission candidate from an experiment run", str(match.features_dir("TEST")))
+    io_utils.log_test_usage(
+        f"exp-predict {args.run}: matcher inference over test candidates (inputs only)",
+        "submission candidate from an experiment run",
+        str(match.features_dir("TEST")),
+    )
     _, _, s1, pool, meta, p_cal, _ = predict_run("TEST", doc, models_dir, lg)
     if meta["limited"]:
         raise RuntimeError("TEST features were built with --limit")
     keep = match.apply_decision(doc["decision"], s1, pool, p_cal)
-    rec = pd.read_parquet(io_utils.work_path("records", "test_s1.parquet"), columns=["s1_idx", "entity_id"])
+    rec = pd.read_parquet(
+        io_utils.work_path("records", "test_s1.parquet"), columns=["s1_idx", "entity_id"]
+    )
     if not np.array_equal(rec["s1_idx"].to_numpy(), np.arange(len(rec))):
         raise RuntimeError("records/test_s1.parquet: s1_idx is not 0..n-1 in file order")
     s1_ids = rec["entity_id"].tolist()
@@ -986,12 +1519,26 @@ def run_exp_predict(args):
     cand_keys = np.sort(match.pair_keys(s1, np.asarray(src)[pool], np.asarray(num)[pool]))
     issues = match.check_matching_file(out_path, s1_ids, cand_keys)
     n_pred = np.bincount(s1, weights=keep, minlength=len(s1_ids))
-    country = pd.read_parquet(io_utils.work_path("records", "test_s1.parquet"), columns=["country_raw"])["country_raw"].to_numpy()
-    per_country = {c: {"n_s1": int((country == c).sum()), "mean_pred_size": float(n_pred[country == c].mean()),
-                       "share_empty": float((n_pred[country == c] == 0).mean())} for c in sorted(set(country.tolist()))}
-    payload = {"run": args.run, "decision": doc["decision"], "pairs": int(keep.sum()), "per_country": per_country,
-               "file": str(out_path), "check": {"passed": not issues, "issues": issues},
-               "wall_s": round(time.time() - t0, 1)}
+    country = pd.read_parquet(
+        io_utils.work_path("records", "test_s1.parquet"), columns=["country_raw"]
+    )["country_raw"].to_numpy()
+    per_country = {
+        c: {
+            "n_s1": int((country == c).sum()),
+            "mean_pred_size": float(n_pred[country == c].mean()),
+            "share_empty": float((n_pred[country == c] == 0).mean()),
+        }
+        for c in sorted(set(country.tolist()))
+    }
+    payload = {
+        "run": args.run,
+        "decision": doc["decision"],
+        "pairs": int(keep.sum()),
+        "per_country": per_country,
+        "file": str(out_path),
+        "check": {"passed": not issues, "issues": issues},
+        "wall_s": round(time.time() - t0, 1),
+    }
     io_utils.write_metrics(f"exp_predict_TEST_{args.run}", payload, len(s1_ids), 0, cfg)
     if issues:
         raise RuntimeError("matching_results.tsv failed checks:\n" + "\n".join(issues))
