@@ -57,6 +57,67 @@ Negative, flat, and failed runs are logged too — they are the part people forg
 
 ## Log
 
+### 2026-09-27 · S8-file · M027 on TEST: 68 live features + ce_rec_c0 p_ce, MATCH_TRAIN 5-fold models · INFO (upload candidate)
+- Parent: M027 · Metrics: `exp_M027.json` (OOF 0.98552), `exp_predict_TEST_M027.json` · Chain:
+  `plan/checks/run_submission_c0.sh` (log `logs/run_submission_c0.log`) · TEST scores: HF Job c0-score-test
+  (a100-large, 49.6 min, 10,613,056 pairs, 0 non-finite, mean p 0.551). exp-predict 291 s.
+- Decision: threshold 0.73 + one-owner. Test: 5,725,343 pairs (S6 5,744,247; S7 5,757,382); 102,386 empty S1;
+  mean predicted size France 3.22 / India 3.29 / US 3.36, ~6% empty in each. File:
+  `submission/output_v8/matching_results.tsv` (sha1 9d5494d7…); official validator --check-ids PASS.
+- Caveat: LightGBM trained on 180K S1, S6 on 1,475,458. Learning curve without CE: +0.0014 per doubling
+  (`learning_curve.json`); with p_ce unmeasured. S8 can land below S6 on the LB. S9 (full_c0, ~837K S1) is the
+  intended upload; S8 is a cheap read of c0 at small scale.
+
+### 2026-09-27 · M027 · ce_rec_c0 score in place of ce_rec (A with the better cross-encoder) · ADOPTED
+- Parent: M020 · Metrics: `exp_M027.json` · Log: `logs/exp_M027.log` · Wall: 1.5 min · Folds 422/383/454/394/370 of 3000
+  (none truncated). Scores: HF Job c0-score-train (a100-large, `ce/hf_job/score_job.py` CE_ADAPTER=adapter_c0,
+  CE_OUT=scores_c0) — MATCH_VALID gate AUC 0.99897, MATCH_TRAIN AUC 0.99893; job cancelled after MATCH_TRAIN to save
+  credits (DEV_REST_REST not scored; its fold 0 is c0 training data anyway).
+- Hypothesis: M020–M026 put all CE value in the per-pair score; c0 has −21% MATCH_VALID logloss (`ce_rec_c0_eval.json`).
+- Change: `cex_p:ce_rec_c0` (69 columns); c0 never saw a MATCH_TRAIN S1.
+- Result: OOF 0.98552 vs M020 0.98446, Δ +0.00106 [0.00091, 0.00121], 2,941 S1 changed; band +0.00321
+  [0.00266, 0.00374]; US +0.00090 [0.00072, 0.00111], India +0.00130 [0.00106, 0.00152], singleton +0.00255
+  [0.00127, 0.00382]. No segment worse. Decision: threshold 0.73 + one-owner.
+- Learned: a better per-pair CE score transfers into LightGBM ~10x more than any CE-derived feature family.
+  More CE training data is the lever (held-out loss still falling at the end of c0).
+- Next: c0 TEST scores (HF c0-score-test running) + training rows for a full-scale model; mini-lockbox MATCH_VALID
+  is c0-scored already on Kaggle (work/ce/ce_rec_c0/MATCH_VALID.parquet).
+
+### 2026-09-27 · M020–M026 · CE-derived feature families A–G on top of p_ce (ce_rec) · DROPPED (flat; keep ce_p alone)
+- Parent: x1_strsim (68 base columns) for all seven; paired also vs M020 (A) · Commit: 9673aec + uncommitted
+  `exp.py` `cex_<family>:<ce>` groups · Metrics: `exp_M020.json` … `exp_M026.json`, `cefe_ablation.json` ·
+  Scripts: `plan/checks/run_cefe_ablation.sh`, `plan/checks/cefe_ablation.py` · Log: `logs/run_cefe_ablation.log` ·
+  Wall: 20 min (7 × ~3 min) · Folds 377–791 of 3000, none truncated.
+- Hypothesis: the cross-encoder scores pairs one at a time but the decision is per S1 list; list-relative CE
+  statistics (rank, margins, list shape), CE-vs-stage-2 disagreement and CE × single-evidence products should
+  add F0.5 over p_ce alone, most on the uncertain band. Evidence before the run: (c) only.
+- Change: A `ce_p` only; B + logit/entropy/confidence; C + rank, top-k flags, gaps to top1/next/previous,
+  t1−t2, t2−t3; D + list mean/std/min/max, z, percentile, softmax share and HHI, normalised entropy, counts
+  ≥ 0.5/0.7/0.8/0.9, same-name (n_tset ≥ 0.95) count and rank; E + p_ce − p_rerank, |·|, CE rank − stage-2 rank,
+  top-1 agreement, margin difference, p_ce − p_ce of stage-2 top1; F + p_ce × n_tset / a_tset / country match /
+  a_house / a_num_jacc / p_rerank / 1/stage-2 rank / l_n / empty address / log_chain / source; G = B..F (50 cols).
+  p_ce is ce_rec, trained on DEV_REST_180K only, so out-of-sample on every MATCH_TRAIN S1 (step "OOF CE" holds).
+- Result (OOF entity F0.5, 180,000 S1; Δ vs A paired, 95% CI):
+  A 0.98446 (vs base +0.00639 [0.00610, 0.00669]); B 0.98445 −0.00001 [−0.00010, 0.00009];
+  C 0.98442 −0.00004 [−0.00016, 0.00008]; D 0.98449 +0.00003 [−0.00009, 0.00016]; E 0.98449 +0.00003
+  [−0.00007, 0.00014]; F 0.98438 −0.00008 [−0.00019, 0.00003]; G 0.98443 −0.00003 [−0.00016, 0.00011];
+  M018 (p, rank, gap — the S6/S7 group) 0.98438 −0.00007 [−0.00017, 0.00004].
+  Band (25.1% of S1): every family within ±0.00017 of A, all CIs cross 0. Empty-address S1 (47.3%): within
+  ±0.00013, all cross 0. hi_name (≥ 2 same-name candidates, 87.8%): within ±0.00009.
+  Singletons (5.7%): C +0.00147, D +0.00245, E +0.00137, G +0.00265 (CIs > 0) — paid back elsewhere
+  (overall flat); G has FP 1,777 vs A 1,861 and FN 10,571 vs 10,454, i.e. an operating-point shift, not new
+  information.
+- Redundancy (`cefe_ablation.json` → redundancy): top-gain CE columns in G are products with ce_p
+  (ce_x_prr, ce_x_s2rank, ce_x_cmatch) and ce_logit — Spearman 0.86–1.00 with ce_p; the list/rank columns have
+  low standalone AUC (0.56–0.70) and small gain. The tree gets the list context from the 14 existing l_* columns
+  (built on p_rerank) plus ce_p.
+- Learned: all of the CE gain is in the per-pair score. LightGBM with the 68 base columns already rebuilds any
+  list-relative view of p_ce it needs; margins, list normalisation, disagreement and interactions add nothing
+  measurable (|Δ| ≤ 0.00008). Per-S1 context is not where the remaining loss is.
+- Next: no larger-set run for any family (step 8 has no winner). Put effort into p_ce quality: ce_rec_c0 scores
+  (HF Jobs c0-score-train / c0-score-test running), then "68 + ce_p(c0)" vs M020 on the same folds. For full-scale
+  models, `cex_p` can replace `ce:` (A ≥ M018 by +0.00007, CI crosses 0 — no reason to change S7).
+
 ### 2026-09-27 · S7-LB · Submission 7 leaderboard: full_ce_nf (full_ce + nfreq) 0.976205 · ADOPTED
 - Log: `reports/test_usage_log.md` · Model metrics: `match_train_full_ce_nf.json` · File: `submission/output_v7/matching_results.tsv`
 - Result: public LB 0.976205 vs S6 0.976128: +0.000077. Internal held-out gain +0.00014 (0.98537 → 0.98551), so the LB
