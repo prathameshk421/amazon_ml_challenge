@@ -263,8 +263,39 @@ def group_num(set_name, X, s1, pool):
         return np.vstack(list(ex.map(_num_chunk, tasks)))
 
 
+_NFREQ_CACHE = {}
+_LEGAL_RE = r"\b(pvt|private|ltd|limited|llc|inc|co|corp|corporation|company|the)\b"
+
+
+def _name_key(names):
+    s = pd.Series(names).fillna("").astype(str).str.lower()
+    return s.str.replace(_LEGAL_RE, "", regex=True).str.replace(r"[^a-z0-9]", "", regex=True).to_numpy()
+
+
+def _nfreq_tables(split):
+    """(S1 name keys, pool name keys, S1 key counts, pool key counts) of one split's own tables (label-free)."""
+    if split not in _NFREQ_CACHE:
+        s1k = _name_key(pq.read_table(io_utils.work_path("records", f"{split}_s1.parquet"),
+                                      columns=["name_raw"]).column("name_raw").to_pylist())
+        pk = _name_key(pq.read_table(io_utils.work_path("records", f"{split}_pool.parquet"),
+                                     columns=["name_raw"]).column("name_raw").to_pylist())
+        _NFREQ_CACHE[split] = (s1k, pk, pd.Series(s1k).value_counts(), pd.Series(pk).value_counts())
+    return _NFREQ_CACHE[split]
+
+
+def group_nfreq(set_name, X, s1, pool):
+    """Whole-name frequency (legal suffixes and punctuation stripped) in the split's own S1 and pool tables:
+    how many S1 / pool records carry the pool record's name, and how many S1 carry the S1's name. A name-only
+    pool record whose name is unique among S1 is far more often a true link (ce_headroom probe)."""
+    s1k, pk, c1, cp = _nfreq_tables("test" if set_name == "TEST" else "train")
+    pkey, skey = pk[pool], s1k[s1]
+    cnt = lambda c, k: np.log1p(pd.Series(k).map(c).fillna(0).to_numpy(dtype=np.float64))
+    return np.column_stack([cnt(c1, pkey), cnt(cp, pkey), cnt(c1, skey)])
+
+
 GROUPS = {
-    "num": (["nm_first_state", "nm_first_logdiff", "nm_any_digit_drop", "nm_post_state", "nm_unit_state",
+    "nfreq": (["nf_pool_name_in_s1", "nf_pool_name_in_pool", "nf_s1_name_in_s1"], group_nfreq),
+    "num":(["nm_first_state", "nm_first_logdiff", "nm_any_digit_drop", "nm_post_state", "nm_unit_state",
              "nm_q_n", "nm_p_n", "nm_shared_same_order"], group_num),
     "sib": (["sb_n_dup", "sb_n_dup_other_src", "sb_dup_max_prr", "sb_dup_max_ntset", "sb_dup_max_atset",
              "sb_best_name_sim", "sb_best_addr_sim", "sb_cluster_share"], group_sib),
@@ -279,6 +310,14 @@ def group_ce(ce_name, set_name, s1, pool):
     """Cross-encoder score from work/ce/<ce_name>/<SET>.parquet (ce/inference.py), joined on (s1_idx, pool_idx):
     p, its rank inside the S1 list (1 = best) and the gap to the list max. Rows without a score stay NaN; a
     missing file raises (never filled silently)."""
+    p = _ce_p(ce_name, set_name, s1, pool)
+    g = pd.DataFrame({"s": s1, "p": p}).groupby("s", sort=False)["p"]
+    rank = g.rank(ascending=False, method="min").to_numpy()
+    gap = g.transform("max").to_numpy() - p
+    return np.column_stack([p, rank, gap])
+
+
+def _ce_p(ce_name, set_name, s1, pool):
     path = io_utils.paths()["work_root"] / "ce" / ce_name / f"{set_name}.parquet"
     if not path.exists():
         raise RuntimeError(f"{path} missing: score {set_name} with ce/inference.py first")
@@ -294,19 +333,144 @@ def group_ce(ce_name, set_name, s1, pool):
         pos = np.minimum(np.searchsorted(ckey, key, sorter=order), max(ckey.size - 1, 0))
         hit = ckey[order[pos]] == key
         p = np.where(hit, pc[order[pos]], np.nan)
-    g = pd.DataFrame({"s": s1, "p": p}).groupby("s", sort=False)["p"]
-    rank = g.rank(ascending=False, method="min").to_numpy()
-    gap = g.transform("max").to_numpy() - p
-    return np.column_stack([p, rank, gap])
+    return p
+
+
+# CE-derived feature families (plan/checks/cefe_ablation.py): everything a tree cannot build from p_ce alone in
+# one split — position and competition inside the S1 list, list shape, disagreement with stage 2, and products
+# with single evidence columns. Each family repeats ce_p so it can be tested alone on top of the 68 base columns.
+_SAME_NAME = 0.95  # n_tset at or above this = "same-name" candidate
+CEX_FAMILIES = {
+    "p": ["ce_p"],
+    "raw": ["ce_p", "ce_logit", "ce_entropy", "ce_conf"],
+    "rank": ["ce_p", "ce_rank", "ce_rank_pct", "ce_top1", "ce_top2", "ce_top3", "ce_gap_top1", "ce_gap_next",
+             "ce_gap_prev", "ce_t1_t2", "ce_t2_t3"],
+    "list": ["ce_p", "ce_l_mean", "ce_l_std", "ce_l_max", "ce_l_min", "ce_z", "ce_pctile", "ce_softmax",
+             "ce_ratio_max", "ce_n_ge05", "ce_n_ge07", "ce_n_ge08", "ce_n_ge09", "ce_frac_above", "ce_l_entropy",
+             "ce_softmax_hhi", "ce_t1_t2", "ce_t1_t3", "ce_samename_n", "ce_samename_rank"],
+    "dis": ["ce_p", "ce_minus_prr", "ce_abs_prr", "ce_rank_minus_s2", "ce_top1_is_s2top1", "ce_s2_top1_agree",
+            "ce_margin_minus_s2", "ce_minus_s2top1"],
+    "int": ["ce_p", "ce_x_ntset", "ce_x_atset", "ce_x_cmatch", "ce_x_house", "ce_x_numjacc", "ce_x_prr",
+            "ce_x_s2rank", "ce_x_ln", "ce_x_aempty", "ce_x_chain", "ce_x_src"],
+}
+CEX_FAMILIES["all"] = list(dict.fromkeys(c for f in ("raw", "rank", "list", "dis", "int") for c in CEX_FAMILIES[f]))
+_CEX_CACHE = {}
+
+
+def cex_table(ce_name, set_name, X, s1, pool):
+    """All CE-derived columns for the feature rows (dict name -> float64 array); inputs only (p_ce, base X)."""
+    key = (ce_name, set_name, int(s1.size))
+    if key in _CEX_CACHE:
+        return _CEX_CACHE[key]
+    p = _ce_p(ce_name, set_name, s1, pool)
+    if np.isnan(p).any():
+        raise RuntimeError(f"{ce_name}/{set_name}: {int(np.isnan(p).sum())} rows without p_ce")
+    pc = np.clip(p, 1e-6, 1 - 1e-6)
+    logit = np.log(pc / (1 - pc))
+    c = {"ce_p": p, "ce_logit": logit,
+         "ce_entropy": -(pc * np.log(pc) + (1 - pc) * np.log(1 - pc)), "ce_conf": np.abs(p - 0.5) * 2}
+
+    # sorted view: S1 ascending, p descending; position 0 = CE top1 of the list
+    order = np.lexsort((-p, s1))
+    inv = np.empty_like(order)
+    inv[order] = np.arange(order.size)
+    ss, ps = s1[order], p[order]
+    start = np.r_[True, ss[1:] != ss[:-1]]
+    gid = np.cumsum(start) - 1
+    gs = np.flatnonzero(start)
+    gn = np.diff(np.r_[gs, ss.size])
+    n = gn[gid].astype(np.float64)
+    pos = np.arange(ss.size) - gs[gid]
+
+    def at(k):  # k-th best p of the row's list (NaN if the list is shorter)
+        idx = gs + k
+        v = np.where(k < gn, ps[np.minimum(idx, ss.size - 1)], np.nan)
+        return v[gid][inv]
+    t1, t2, t3 = at(0), at(1), at(2)
+    nxt = np.where(pos < gn[gid] - 1, ps[np.minimum(np.arange(ss.size) + 1, ss.size - 1)], np.nan)[inv]
+    prv = np.where(pos > 0, ps[np.maximum(np.arange(ss.size) - 1, 0)], np.nan)[inv]
+    n = n[inv]
+
+    df = pd.DataFrame({"s": s1, "p": p, "e": np.exp(logit)})
+    g = df.groupby("s", sort=False)
+    rank = g["p"].rank(ascending=False, method="min").to_numpy()
+    rank_max = g["p"].rank(ascending=False, method="max").to_numpy()
+    mean, std = g["p"].transform("mean").to_numpy(), g["p"].transform("std", ddof=0).to_numpy()
+    soft = df["e"].to_numpy() / g["e"].transform("sum").to_numpy()
+    df["soft2"] = soft ** 2
+    q = p / np.maximum(g["p"].transform("sum").to_numpy(), 1e-12)
+    df["qlq"] = -q * np.log(np.maximum(q, 1e-12))
+    g = df.groupby("s", sort=False)
+    multi = n >= 2
+    c.update({
+        "ce_rank": rank, "ce_rank_pct": np.where(multi, (rank - 1) / np.maximum(n - 1, 1), np.nan),
+        "ce_top1": (rank <= 1).astype(np.float64), "ce_top2": (rank <= 2).astype(np.float64),
+        "ce_top3": (rank <= 3).astype(np.float64),
+        "ce_gap_top1": t1 - p, "ce_gap_next": p - nxt, "ce_gap_prev": prv - p,
+        "ce_t1_t2": t1 - t2, "ce_t2_t3": t2 - t3, "ce_t1_t3": t1 - t3,
+        "ce_l_mean": mean, "ce_l_std": std, "ce_l_max": t1, "ce_l_min": g["p"].transform("min").to_numpy(),
+        "ce_z": np.where(multi & (std > 1e-9), (p - mean) / np.where(std > 1e-9, std, 1), np.nan),
+        "ce_pctile": np.where(multi, (n - rank_max) / np.maximum(n - 1, 1), np.nan),
+        "ce_softmax": soft, "ce_ratio_max": p / np.maximum(t1, 1e-12),
+        "ce_frac_above": (rank - 1) / n,
+        "ce_l_entropy": np.where(multi, g["qlq"].transform("sum").to_numpy() / np.log(np.maximum(n, 2)), np.nan),
+        "ce_softmax_hhi": g["soft2"].transform("sum").to_numpy(),
+    })
+    for thr, name in ((0.5, "05"), (0.7, "07"), (0.8, "08"), (0.9, "09")):
+        df["b"] = (p >= thr).astype(np.float64)
+        c[f"ce_n_ge{name}"] = df.groupby("s", sort=False)["b"].transform("sum").to_numpy()
+
+    # rank among same-name candidates (n_tset >= 0.95) of the list; NaN when the row itself is not same-name
+    same = _col(X, "n_tset") >= _SAME_NAME
+    df["sp"] = np.where(same, p, np.nan)
+    gsn = df.groupby("s", sort=False)["sp"]
+    c["ce_samename_n"] = gsn.transform("count").to_numpy().astype(np.float64)
+    c["ce_samename_rank"] = np.where(same, gsn.rank(ascending=False, method="min").to_numpy(), np.nan)
+
+    # disagreement with stage 2 (p_rerank, its list rank)
+    prr, s2rank = _col(X, "p_rerank"), _col(X, "rank")
+    s2_top = s2rank <= 1
+    df["ce_at_s2top"] = np.where(s2_top, p, np.nan)
+    df["prr"] = prr
+    g = df.groupby("s", sort=False)
+    ce_at_s2top = g["ce_at_s2top"].transform("max").to_numpy()
+    prr_rank = g["prr"].rank(ascending=False, method="first").to_numpy()
+    df["prr2"] = np.where(prr_rank == 2, prr, np.nan)
+    s2_margin = g["prr"].transform("max").to_numpy() - df.groupby("s", sort=False)["prr2"].transform("max").to_numpy()
+    c.update({
+        "ce_minus_prr": p - prr, "ce_abs_prr": np.abs(p - prr), "ce_rank_minus_s2": rank - s2rank,
+        "ce_top1_is_s2top1": ((rank <= 1) & s2_top).astype(np.float64),
+        "ce_s2_top1_agree": (np.abs(ce_at_s2top - t1) < 1e-12).astype(np.float64),
+        "ce_margin_minus_s2": (t1 - t2) - s2_margin,
+        "ce_minus_s2top1": p - ce_at_s2top,
+    })
+
+    # products with one evidence column each; binary/categorical columns as indicators, not codes
+    col = lambda f: np.nan_to_num(_col(X, f), nan=-1.0)
+    c.update({
+        "ce_x_ntset": p * _col(X, "n_tset"), "ce_x_atset": p * _col(X, "a_tset"),
+        "ce_x_cmatch": p * (col("country3") == 1), "ce_x_house": p * _col(X, "a_house"),
+        "ce_x_numjacc": p * _col(X, "a_num_jacc"), "ce_x_prr": p * prr, "ce_x_s2rank": p / np.maximum(s2rank, 1),
+        "ce_x_ln": p * _col(X, "l_n"), "ce_x_aempty": p * (col("a_empty") == 1), "ce_x_chain": p * _col(X, "log_chain"),
+        "ce_x_src": p * (col("src") == 3),
+    })
+    _CEX_CACHE[key] = c
+    return c
 
 
 def group_spec(name):
-    """(columns, fn) of a feature group; 'ce:<name>' is a cross-encoder score group (not cached: the score file
-    is the cache, and a re-scored file must not be shadowed by an old copy)."""
+    """(columns, fn) of a feature group; 'ce:<name>' is a cross-encoder score group and 'cex_<family>:<name>' a
+    CE-derived family (neither cached: the score file is the cache, and a re-scored file must not be shadowed
+    by an old copy)."""
     if name.startswith("ce:"):
         ce = name[3:]
         return ([f"p_{ce}", f"p_{ce}_rank", f"p_{ce}_gap"],
                 lambda set_name, X, s1, pool: group_ce(ce, set_name, s1, pool))
+    if name.startswith("cex_"):
+        fam, ce = name[4:].split(":")
+        cols = CEX_FAMILIES[fam]
+        return (list(cols), lambda set_name, X, s1, pool:
+                np.column_stack([cex_table(ce, set_name, X, s1, pool)[k] for k in cols]))
     return GROUPS[name]
 
 
@@ -317,7 +481,7 @@ def group_path(set_name, name):
 def load_group(set_name, name, X, s1, pool, lg=None):
     """Group columns for the feature rows (cached per set; the cache stores s1/pool to verify row order)."""
     cols, fn = group_spec(name)
-    if name.startswith("ce:"):
+    if name.startswith(("ce:", "cex_")):
         return fn(set_name, X, s1, pool).astype(np.float32)
     path = group_path(set_name, name)
     if path.exists():
@@ -720,6 +884,15 @@ def predict_run(set_name, doc, models_dir, lg=None):
             raise RuntimeError(f"{models_dir}: expected {doc['n_folds'] * n_seeds} model files")
         m = band if band is not None else np.ones(X.shape[0], bool)
         raw[m] = _avg_predict(files, X[m])
+        blend = doc.get("xgb_blend")
+        if blend:  # (1 - w) * LightGBM average + w * XGBoost average (plan/checks/train_xgb_blend.py)
+            import xgboost as xgb
+            dm = xgb.DMatrix(X[m], feature_names=list(doc["features_used"]))
+            px = np.zeros(int(m.sum()))
+            for f in blend["files"]:
+                b = xgb.Booster(model_file=str(models_dir / f))
+                px += b.predict(dm) / len(blend["files"])
+            raw[m] = (1 - blend["weight"]) * raw[m] + blend["weight"] * px
     if residual:
         p_cal = par_cal.astype(np.float32).copy()
         p_cal[band] = match.calibrate(raw[band], doc["calibration"])

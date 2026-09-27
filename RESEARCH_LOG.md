@@ -43,17 +43,112 @@ Negative, flat, and failed runs are logged too — they are the part people forg
 | 3 matcher | MATCH_VALID 20K | entity F0.5 | 0.98162 | M005 | `match_valid_confirm_M005.json` |
 | 3 matcher | MATCH_TRAIN 180K OOF | entity F0.5 | 0.98211 (comp + num) | M016 | `exp_M016.json` |
 | 3 matcher | MATCH_ALL held-out 165K | entity F0.5 | 0.98360 (full_comp; full_single 0.98161 same S1) | M005-full | `match_train_full_comp.json` |
-| submission | test (public LB) | entity F0.5 | 0.966797 (S2, full_single); S1 0.966109; S3 0.966 (rounded, worse) | S2 | `match_train_full_single.json`, `reports/test_usage_log.md` |
+| 3 matcher | MATCH_ALL − DEV_REST_180K held-out 147K | entity F0.5 | 0.98537 (full_ce, + p_ce; full_single 0.98162 same S1) | S6-file | `match_train_full_ce.json` |
+| 3 matcher | MATCH_ALL − DEV_REST_180K held-out 147K | entity F0.5 | 0.98551 (full_ce_nf, + nfreq) | S7-file | `match_train_full_ce_nf.json` |
+| submission | test (public LB) | entity F0.5 | **0.976205 (S7, full_ce_nf)**; S6 0.976128; S2 0.966797; S1 0.966109; S3 0.966 (rounded) | S7-LB | `match_train_full_ce_nf.json`, `reports/test_usage_log.md` |
 
 ## Open questions
 
-- Internal→leaderboard gap −0.0148 (S2). N03/N04 explain ~0.008 from list statistics; ~0.006 is not visible without labels. Plan: `plan/RCA_RESEARCH_PLAN.md`.
+- Internal→leaderboard gap −0.0092 (S6; was −0.0148 at S2). N03/N04 explain ~0.008 from list statistics; ~0.006 is not visible without labels. Plan: `plan/RCA_RESEARCH_PLAN.md`.
 - Paired SE of a feature change at 180K. Unmeasured until the first M run (N01 only covers one-owner).
 - How much the OOF score is inflated by `translit_dict` being mined from DICT_SRC labels (VALIDATION_PLAN P4). Unmeasured.
 
 ---
 
 ## Log
+
+### 2026-09-27 · S7-LB · Submission 7 leaderboard: full_ce_nf (full_ce + nfreq) 0.976205 · ADOPTED
+- Log: `reports/test_usage_log.md` · Model metrics: `match_train_full_ce_nf.json` · File: `submission/output_v7/matching_results.tsv`
+- Result: public LB 0.976205 vs S6 0.976128: +0.000077. Internal held-out gain +0.00014 (0.98537 → 0.98551), so the LB
+  kept ~55% of it. Internal→LB gap 0.98551 − 0.976205 = 0.0093 (S6: 0.0092).
+- Learned: nfreq transfers, at about half size; as small as M019 predicted. Gap unchanged: nfreq does not touch the
+  test-heavier error types.
+- Next: full_ce_nf is the base for submission 8 (ce_rec_c0 p_ce + fold-1 adapter).
+
+### 2026-09-27 · CE-C0 · ce_rec continued on DEV_REST_REST fold 0 (ce_rec_c0) · INFO (standalone win; not yet in a matcher)
+- Kernel: `prathameshkinagi/ber-ce-qwen-v2m3` v2 (2×T4, 04:09 → 10:57, 8.97 GPU-h used of the week). Code:
+  `ce/train_continue.py`, `ce/kaggle_continue/`. Outputs: `work/ce/kaggle_out/qwen_v2m3_v2/`, copied to
+  `work/ce/ce_rec_c0/` (adapter, train_meta.json, MATCH_VALID.parquet). Metrics: `ce_rec_c0_eval.json`.
+  v1 FAILED in 7 min (Kaggle peft vs preinstalled torchao 0.10); v2 uninstalls torchao.
+- Change: ce_rec LoRA (bge-reranker-v2-m3) continued for 1 epoch on DEV_REST_REST fold 0 (top bit of
+  s1_idx·0x9E3779B1; 3,285,477 pairs, 605,841 S1), lr 5e-5 linear decay, batch 32, fp16 + GradScaler on one T4.
+  161 pairs/s, 6.48 h, 0 skipped batches, peak VRAM 6.16 GB.
+- Result: fold-0 held-out (30,000 pairs) logloss 0.0514 → 0.0410, AUC 0.99835 → 0.99894, still falling at the end.
+  MATCH_VALID (108,493 pairs, trained on by neither): AUC 0.99841 → 0.99896, logloss 0.0507 → 0.0402, PR-AUC
+  0.99902 → 0.99935. Pool-address-empty subset (13,290 pairs; 75% of full_ce FN_in_list): AUC 0.932 → 0.946,
+  PR-AUC 0.713 → 0.754, logloss 0.253 → 0.220. Alias subset AUC 0.992 → 0.994.
+- Qwen3-Reranker-0.6B (GPU 0): FAILED at the first training step, CUDA OOM on the 14.5 GB T4 (batch 32, fp32 master
+  weights, no gradient checkpointing). Zero-shot held-out AUC with the short prompt: 0.824. No comparison yet.
+- Learned: more data of the same kind still helps the cross-encoder (−21% logloss on MATCH_VALID from 3.4× the
+  pairs), most on the empty-address rows where full_ce loses most. Standalone win only; adoption needs the matcher run.
+- Next: p_ce from ce_rec_c0 needs TEST + MATCH_TRAIN + fold 1 scored (~15M pairs); a fold-1 adapter restores
+  fold 0 to LightGBM. Qwen retry needs gradient checkpointing + batch 16.
+
+### 2026-09-27 · S7-file · full_ce_nf: full_ce + nfreq (M019), MATCH_ALL minus DEV_REST_180K · INFO (upload candidate)
+- Parent: full_ce · Commit: 9673aec (+ uncommitted exp.py nfreq group) · Metrics: `match_train_full_ce_nf.json`,
+  `exp_predict_TEST_full_ce_nf.json` · Chain: `plan/checks/run_submission_ce_nfreq.sh` (log
+  `logs/run_submission_ce_nfreq.log`) · Wall: train 1168 s, exp-predict 561 s.
+- Change: 71 full_ce features + `nf_pool_name_in_s1`, `nf_pool_name_in_pool`, `nf_s1_name_in_s1`; same seeded fit /
+  early-stop / calibration split as full_ce.
+- Result: best_iteration 2330/12000 (converged). Calibration slice 147,462 S1: 0.98551 vs full_ce 0.98537 (+0.00014,
+  unpaired; paired vs full_single +0.00389 [0.00362, 0.00416] vs full_ce's +0.00375). Decision: threshold 0.67 + one-owner.
+- Test: 5,757,382 pairs, 103,178 empty S1. File: `submission/output_v7/matching_results.tsv` (sha1 2dc021d1…);
+  official validator --check-ids PASS.
+- Learned: nfreq's gain at full scale matches M019 (+0.00018 at 180K). Small.
+- Next: upload S7; expect roughly S6 + 0.0001 on the LB (d).
+
+### 2026-09-27 · XGB-BLEND · XGBoost + LightGBM blend on full_ce (ALTERNATIVE_APPROACHES 1.6) · DROPPED (flat)
+- Parent: full_ce · Commit: 9673aec (+ uncommitted `plan/checks/train_xgb_blend.py`, `exp.py` xgb_blend hook) ·
+  Metrics: `match_train_full_ce_xgb.json` · Log: `logs/train_xgb_blend_full_ce_xgb.log` · Wall: 32 min (XGBoost fit 28 min)
+- Hypothesis: a second GBDT implementation (XGBoost hist, lossguide 63 leaves, eta 0.05, same 71 features, same fit /
+  early-stop / calibration S1 as full_ce) makes partly independent errors, so averaging raw probabilities should
+  raise F0.5 on the band rows. Evidence before the run: (c) only; the repo plan rated it low.
+- Result: XGBoost best_iteration 2788/12000 (converged). Calibration slice 147,462 S1, every predictor put through the
+  same isotonic + threshold + one-owner procedure (LightGBM re-scored = recorded 0.98537 exactly):
+  XGBoost alone 0.98538 (Δ +0.00001 [−0.00007, +0.00009]); blend w=0.5 (fixed before the run) 0.98537
+  (Δ +0.0000002 [−0.00007, +0.00007], 585 S1 changed); w=0.25 / 0.75 also inside ±0.00008.
+  AUC 0.999485 vs 0.999484; raw-probability correlation 0.99975.
+- Learned: on these features the two libraries learn the same function (corr 0.99975), so averaging removes no error.
+  The remaining loss is in the features and the recall ceiling, not in LightGBM's variance. A 3-seed LightGBM bag
+  (RCA plan G2) should be flat for the same reason — not worth running.
+- Model: `work/match/runs/full_ce_xgb/models/` (LightGBM full_ce + xgb_fold0.ubj, w 0.5) is submittable via
+  `exp-predict --run full_ce_xgb`, but not built or uploaded: expected LB change ≈ 0.
+- Next: none on GBDT swaps/ensembles.
+
+### 2026-09-27 · M019 · nfreq: whole-name frequency in the split's own S1 / pool tables · PARKED (small, positive)
+- Parent: M018 · Metrics: `exp_M019.json` · Wall: 11 min · Folds 644/398/555/583/357 of 3000 (none truncated).
+- Hypothesis: N09 — among empty-address same-name rows, positive rate 67% when the name is on exactly 1 S1 vs 8% on 4+.
+- Result: OOF 0.98456 vs 0.98438, Δ +0.00018 [0.00007, 0.00029]; band +0.00067 [0.00023, 0.00109].
+- Learned: the idf features already carry most of the name-frequency signal. Keep for the next full run only if bundled.
+
+### 2026-09-27 · M018 · p_ce group on the MATCH_TRAIN 5-fold protocol · ADOPTED (parent for p_ce-era runs)
+- Parent: x1_strsim · Metrics: `exp_M018.json` · Wall: 5 min · Folds 423/589/720/477/473 of 3000 (none truncated).
+- Result: OOF 0.98438 vs 0.97807, Δ +0.00631 [0.00603, 0.00662]; band +0.02160. (Full-scale S6: +0.00375, LB +0.00933.)
+
+### 2026-09-27 · N09 · Headroom of full_ce + four probes (what could reach LB 0.98) · INFO
+- Metrics: `ce_headroom_full_ce.json`, `ce_headroom_tags.json` · Scripts: `plan/checks/ce_headroom.py`, `ce_headroom_tags.py`;
+  probes in logs/{empty_addr_probe,cut_probe,biencoder_probe,tta_probe}.log (scratch scripts, not in repo).
+- Slice: 19,985 full_ce calibration S1 in MATCH_TRAIN/MATCH_VALID, F0.5 0.98613. Errors: FP 154, FN_in_list 1,048,
+  FN_cut 521 (in K_min 20 list, cut from K5), FN_stage1 1,101. Oracle gains: FN_in_list +0.0053, FN_stage1 +0.0054,
+  FP +0.0018, FN_cut +0.0017.
+- FN_in_list: 75% pool address empty, 56% name token-set >= 95. Empty-address same-name rows are 28.9% positive
+  (6,329 rows); p_ce separates them best (<=0.3: 9%, 0.7-0.9: 70%); exact text twins explain only 41 FN.
+- FN_cut probe (CE on 521 cut positives + 3,000 of 301,252 cut negatives): at p_ce >= 0.8, 264 TP for ~100 FP
+  (1 sampled negative x100, noisy); 1 FP costs ~3.6 TP under F0.5 here -> about break-even on p_ce alone.
+- Bi-encoder probe (multilingual-e5-small, 100K random pool distractors): true record ranked first for 50% of
+  FN_stage1 (63% top-3, 75% top-11) vs 91% for found pairs. Full pool is 103x larger: recall at k~50 unmeasured.
+- Order-swap TTA: swapped-input AUC 0.521 on 10,126 uncertain MATCH_VALID pairs (model is order-dependent) — dead.
+- CE learning curve (friend's log): held-out loss 0.0615 @240K pairs, 0.0537 @480K, 0.049 @970K (still falling).
+
+### 2026-09-27 · S6-LB · Submission 6 leaderboard: full_ce (p_ce feature) 0.976128 · ADOPTED
+- Log: `reports/test_usage_log.md` · Model metrics: `match_train_full_ce.json` · File: `submission/output_v6/matching_results.tsv`
+- Result: public LB 0.976128 (rank 741) vs S2 0.966797: +0.009331. Internal held-out gain was +0.00375, so the LB gain
+  is ~2.5x the internal one. Internal→LB gap 0.98537 − 0.976128 = 0.0092 (S2: 0.0148).
+- Learned: first internal gain that transferred in full (S2 kept ~10%, S3 negative). A per-pair text score from a
+  multilingual cross-encoder transfers to test; cross-list statistics (comp) did not. Test-heavier error types
+  (France, transliteration) are plausibly where p_ce helps most — unmeasured without labels.
+- Next: full_ce is the new base. Candidates: p_ce on DEV_REST_180K via a second adapter trained on other S1
+  (restores 180K S1 of training rows); cross-encoder recall channel for FN_MISSED (42% of loss, N08).
 
 ### 2026-09-27 · S6-file · full_ce: live features + cross-encoder p_ce group, MATCH_ALL minus DEV_REST_180K · INFO (upload candidate)
 - Metrics: `match_train_full_ce.json` · Chain: `plan/checks/run_submission_ce.sh` (log `logs/run_submission_ce.log`) ·

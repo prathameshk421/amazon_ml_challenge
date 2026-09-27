@@ -22,6 +22,8 @@ from huggingface_hub import HfApi, snapshot_download
 
 REPO = os.environ.get("CE_REPO", "prathameshk421/ber-ce-scoring")
 BASE = "BAAI/bge-reranker-v2-m3"
+ADAPTER = os.environ.get("CE_ADAPTER", "adapter")  # adapter dir inside REPO (c0: adapter_c0)
+OUT = os.environ.get("CE_OUT", "scores")  # score prefix inside REPO (c0: scores_c0)
 SETS = os.environ.get("CE_SETS", "MATCH_VALID,MATCH_TRAIN_S20000,TEST").split(",")
 CHUNK = 1_000_000
 MAX_LEN = 128
@@ -30,7 +32,7 @@ TOKENS_PER_BATCH = int(os.environ.get("CE_TOKENS_PER_BATCH", "131072"))
 
 api = HfApi()
 root = Path(snapshot_download(REPO, repo_type="dataset", local_dir="/tmp/ce_in",
-                              allow_patterns=["pairs_*.parquet", "adapter/*", "common.py"]))
+                              allow_patterns=[f"pairs_{s}.parquet" for s in SETS] + [f"{ADAPTER}/*", "common.py"]))
 sys.path.insert(0, str(root))
 import common  # noqa: E402
 from peft import PeftModel  # noqa: E402
@@ -40,7 +42,7 @@ dev = common.device()
 print(f"device {dev} {torch.cuda.get_device_name() if dev.type == 'cuda' else ''}", flush=True)
 tok = AutoTokenizer.from_pretrained(BASE)
 model = AutoModelForSequenceClassification.from_pretrained(BASE, num_labels=1, dtype=torch.float32)
-model = PeftModel.from_pretrained(model, str(root / "adapter")).merge_and_unload()
+model = PeftModel.from_pretrained(model, str(root / ADAPTER)).merge_and_unload()
 bf16 = dev.type == "cuda" and torch.cuda.is_bf16_supported()
 model = model.to(torch.bfloat16 if bf16 else torch.float32).to(dev).eval()
 print(f"model ready, dtype {next(model.parameters()).dtype}", flush=True)
@@ -83,7 +85,7 @@ for set_name in SETS:
         pq.write_table(pa.table({"s1_idx": pa.array(t.column("s1_idx").to_numpy().astype(np.int32)),
                                  "pool_idx": pa.array(t.column("pool_idx").to_numpy().astype(np.uint32)),
                                  "p_ce": pa.array(p.astype(np.float32))}), path, compression="zstd")
-        upload(path, f"scores/{set_name}/{path.name}")
+        upload(path, f"{OUT}/{set_name}/{path.name}")
         dt = time.time() - t0
         done = c0 + t.num_rows
         eta = (table.num_rows - done) / (done / (time.time() - t_set))

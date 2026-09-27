@@ -29,13 +29,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ce", default="ce_rec")
     ap.add_argument("--sets", default=",".join(SETS))
+    ap.add_argument("--prefix", default="scores", help="score prefix in the HF repo (c0: scores_c0)")
     args = ap.parse_args()
     ce = io_utils.paths()["work_root"] / "ce"
-    dl = Path(snapshot_download(REPO, repo_type="dataset", local_dir=str(ce / "hf_pull"), allow_patterns=["scores/*"]))
+    dl = Path(snapshot_download(REPO, repo_type="dataset", local_dir=str(ce / "hf_pull"), allow_patterns=[f"{args.prefix}/*"]))
     out = ce / args.ce
     out.mkdir(parents=True, exist_ok=True)
     for s in args.sets.split(","):
-        parts = sorted((dl / "scores" / s).glob("c*.parquet"))
+        parts = sorted((dl / args.prefix / s).glob("c*.parquet"))
         ref = pq.read_table(ce / f"pairs_{s}.parquet", columns=["s1_idx", "pool_idx"])
         t = pa.concat_tables([pq.read_table(p) for p in parts]) if parts else None
         if t is None or t.num_rows != ref.num_rows:

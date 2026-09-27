@@ -31,6 +31,10 @@ is the fix — a measured table, and a mechanical check to run after every train
 | train_final_comp (1,655,458 S1, one model, 75 features incl. comp) | 8,979,983 | 7,633,743 | 12000 | 6524 (converged) | No (`match_train_full_comp.json`) |
 | train_final_comp full_comp_num (1,655,458 S1, one model, 83 features incl. comp + num) | 8,979,983 | 7,633,743 | 12000 | 5636 (converged) | No (`match_train_full_comp_num.json`) |
 | train_final_comp full_ce (MATCH_ALL minus DEV_REST_180K = 1,475,458 S1, one model, 71 features incl. p_ce group) | 8,003,081 | 6,803,405 | 12000 | 2334 (converged) | No (`match_train_full_ce.json`) |
+| train_xgb_blend full_ce_xgb (XGBoost hist, lossguide 63 leaves, eta 0.05; same rows as full_ce) | 8,003,081 | 6,803,405 | 12000 | 2788 (converged) | No (`match_train_full_ce_xgb.json`) |
+| train_final_comp full_ce_nf (MATCH_ALL minus DEV_REST_180K = 1,475,458 S1, one model, 74 features: full_ce + nfreq) | 8,003,081 | 6,803,405 | 12000 | 2330 (converged) | No (`match_train_full_ce_nf.json`) |
+| exp M018 main (180,000 S1, + p_ce) | 975,699 | ~702,500 | 3000 | 423, 589, 720, 477, 473 | No (`exp_M018.json`) |
+| exp M019 main (180,000 S1, + p_ce + nfreq) | 975,699 | ~702,500 | 3000 | 644, 398, 555, 583, 357 | No (`exp_M019.json`) |
 
 | exp R0 main (180,000 S1) | 975,699 | ~702,500 | 3000 | 1651, 1819, 2011, 1908, 1574 | No (`exp_R0.json`) |
 | exp M005 main (180,000 S1) | 975,699 | ~702,500 | 3000 | 1758, 1672, 1538, 1465, 1200 | No (`exp_M005.json`) |
