@@ -13,7 +13,9 @@ repository. Every reported number is written by a command into `artifacts/metric
   multiprocessing, so it also runs on Linux/WSL2 and Windows.
 - `python -m venv .venv && .venv/bin/pip install -r submission/code/business_entity_resolution/requirements.txt`
 - Libraries: numpy, pandas, pyarrow, rapidfuzz (MIT), jellyfish (MIT), scikit-learn (BSD-3),
-  scipy, lightgbm (MIT), tqdm, matplotlib. No pretrained models. No network access is used at any step.
+  scipy, lightgbm (MIT), tqdm, matplotlib. Stages 1–3 of this package do not download a model.
+  The submitted system also scores `BAAI/bge-reranker-v2-m3` (LoRA) and retrieves with a
+  distilled `intfloat/multilingual-e5-small`; that path is in the repository README.
 
 ## 2. Layout and conventions
 
