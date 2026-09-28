@@ -58,6 +58,34 @@ Negative, flat, and failed runs are logged too — they are the part people forg
 
 ## Log
 
+### 2026-09-28 · SMOKE3 · c0 rescoring drift vs reference, cause open · INFO
+- Rescoring 2,000 MATCH_VALID rows with the shipped c0 adapter (T4 torch 2.6, and Mac MPS) vs
+  `work/ce/ce_rec_c0/MATCH_VALID.parquet`: same adapter sha1 `7398d2ce`; AUC 0.99906; mean |diff| 0.0011,
+  max 0.446; 7/2000 flips at 0.995, 3 at 0.73. Not truncation (all top-5 diffs ≤ 86 tokens). Cause not
+  established: numerics vs. a different pair serialization in the reference run (2 of the top 5 have empty
+  pool addresses). Submission files unaffected.
+
+### 2026-09-28 · SMOKE2 · CUDA smoke of submission package, retry (unpinned deps) · INFO
+- Job `pkg-cuda-smoke4` (6abaafe052d0dbd7f1da3c38), t4-small, COMPLETED in 98 s running (~$0.011).
+  Two earlier attempts failed in minutes on setup (no `huggingface_hub` in image python; `pip` vs `python`
+  interpreter split; missing `-r`; numpy pin needs Python >= 3.12 vs image 3.11). Retry kept image torch
+  2.6.0+cu124 and installed the rest unpinned.
+- 2a PASS (PIP_EXIT=0, torch 2.6.0+cu124 on Tesla T4 kept). 2b PASS: `device cuda, amp torch.float16`,
+  5 steps (fold 0: 956 train pairs; held-out logloss 0.02203 -> 0.02007), `/tmp/c0_smoke/adapter/
+  adapter_model.safetensors` present (13,661,132 B). Tokenizer loaded from the base, confirming the fix.
+- 2c MIXED: SMOKE AUC 0.99907; n=2000 maxdiff=0.417245 meandiff=0.001088 flips073=3 flips995=7. Against the
+  rubric (flips995=0, maxdiff ~1e-3) this is not clean: 7 pairs cross 0.995 between the shipped-adapter
+  rescoring (unpinned transformers, fp32 merge on T4) and the original A100 run. Not root-caused; candidates:
+  library-version drift from the unpinned install, fp32-vs-bf16 merge dtype, T4-vs-A100 numerics.
+- Bundle `smoke/` deleted from the hub repo. No score claims; the 2c gap needs a look before DRACE depends on it.
+
+### 2026-09-28 · SMOKE · CUDA smoke of submission package on HF t4-small · FAILED (infra, no score)
+- Job `pkg-cuda-smoke` (6abaaecf52d0dbd7f1da3bf8), image pytorch:2.6.0-cuda12.4, 45m cap (~$0.30 worst case).
+  Failed in minutes at setup: the image's `python` has no `huggingface_hub` (bundle download failed) and `pip`
+  vs `python` resolved to different interpreters (PIP_EXIT=0, yet `import torch` failed on missing `pyarrow`).
+  Fix for retry: `python -m pip` throughout and pre-install `huggingface_hub` before the download step.
+- Bundle `smoke/` uploaded then deleted from the hub repo. No scores produced; nothing to claim.
+
 ### 2026-09-27 · S18-LB · Submission 18 leaderboard: S17 + distilled S1 ranks 8-10, 0.984075 · ADOPTED
 - Log: `reports/test_usage_log.md` · Metrics: `drace_test_s18.json` · Chain: `plan/checks/run_s18.sh` (log `logs/run_s18.log`)
   · File: `submission/output_v18/matching_results.tsv` (sha1 7334635c…).
