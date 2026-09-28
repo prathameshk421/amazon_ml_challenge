@@ -1,0 +1,61 @@
+{
+  "seed": 42,
+  "val_frac": 0.2,
+  "stratify": "country x singleton vs matched",
+  "n_s1": 2206821,
+  "n_train_s1": 1765458,
+  "n_validation_s1": 441363,
+  "strata": {
+    "India|matched": {
+      "n": 833837,
+      "validation": 166767,
+      "train": 667070
+    },
+    "India|singleton": {
+      "n": 49351,
+      "validation": 9870,
+      "train": 39481
+    },
+    "US|matched": {
+      "n": 1249737,
+      "validation": 249947,
+      "train": 999790
+    },
+    "US|singleton": {
+      "n": 73896,
+      "validation": 14779,
+      "train": 59117
+    }
+  },
+  "singleton": {
+    "train": {
+      "n": 1765458,
+      "n_singleton": 98598,
+      "rate": 0.05584839741302257
+    },
+    "validation": {
+      "n": 441363,
+      "n_singleton": 24649,
+      "rate": 0.055847454362962005
+    }
+  },
+  "country": {
+    "train": {
+      "US": 1058907,
+      "India": 706551
+    },
+    "validation": {
+      "US": 264726,
+      "India": 176637
+    }
+  },
+  "files": {
+    "s1_train": "train_source1_train.tsv",
+    "s1_validation": "train_source1_validation.tsv",
+    "ground_truth_train": "train_ground_truth_train.tsv",
+    "ground_truth_validation": "train_ground_truth_validation.tsv",
+    "s2_unchanged": "train_source2.tsv",
+    "s3_unchanged": "train_source3.tsv"
+  },
+  "rule": "S2 and S3 stay whole. Validation S1 ground truth is for scoring only."
+}

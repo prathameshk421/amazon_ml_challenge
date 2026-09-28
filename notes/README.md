@@ -1,6 +1,6 @@
 # notes/ : how much to trust each file
 
-Authority order: AGENTS.md > overnight_eda_agent_prompt.md > notes/problem_statement.md (official spec) > everything else.
+Authority order: AGENTS.md > archive/agent_runs/overnight_eda_agent_prompt.md (retired) > notes/problem_statement.md (official spec) > everything else.
 
 | File | Trust | Use it for |
 |---|---|---|

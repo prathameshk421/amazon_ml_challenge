@@ -162,8 +162,8 @@
  },
  "config_hash": "80358ebebc200c11e94b10a75806e40cf58b12b7",
  "norm_version": "2.1",
- "git_commit": "5272d4885f29b8c8f8cc1433e15199fdd5e6b49b",
- "created_at": "2026-09-25T16:03:27+05:30",
+ "git_commit": "d35b9320c8046f0f3ed4c6c8dbae7bf903ce35c3",
+ "created_at": "2026-09-25T18:53:43+05:30",
  "n_pool": 10320219,
  "G": [
   "academy",
@@ -408,9 +408,10 @@
  "build_df_limit": 51601,
  "chunk": 250000,
  "n_shards": 64,
+ "norm_input_fingerprint": "405914592:1790341653981009659",
  "families": {
   "EN": {
-   "n_keys": 7085804,
+   "n_keys": 7085837,
    "n_postings": 10320219,
    "n_dropped": 0,
    "df_quantiles": {
@@ -419,12 +420,12 @@
     "p99": 7,
     "max": 1071
    },
-   "bytes": 154654260,
-   "wall_s": 56.9
+   "bytes": 154654788,
+   "wall_s": 67.5
   },
   "NT": {
    "n_keys": 1433669,
-   "n_postings": 21811258,
+   "n_postings": 21811228,
    "n_dropped": 61,
    "df_quantiles": {
     "p50": 1,
@@ -432,12 +433,12 @@
     "p99": 119,
     "max": 51256
    },
-   "bytes": 110184744,
-   "wall_s": 61.7
+   "bytes": 110184624,
+   "wall_s": 68.0
   },
   "NG": {
    "n_keys": 31057,
-   "n_postings": 52876103,
+   "n_postings": 52875998,
    "n_dropped": 988,
    "df_quantiles": {
     "p50": 49,
@@ -445,12 +446,12 @@
     "p99": 34976,
     "max": 51519
    },
-   "bytes": 212009748,
-   "wall_s": 139.0
+   "bytes": 212009328,
+   "wall_s": 144.2
   },
   "NP": {
-   "n_keys": 7839912,
-   "n_postings": 49681556,
+   "n_keys": 7839888,
+   "n_postings": 49681182,
    "n_dropped": 23,
    "df_quantiles": {
     "p50": 1,
@@ -458,12 +459,12 @@
     "p99": 56,
     "max": 50226
    },
-   "bytes": 324165520,
-   "wall_s": 69.1
+   "bytes": 324163640,
+   "wall_s": 81.4
   },
   "PH": {
    "n_keys": 633458,
-   "n_postings": 19267763,
+   "n_postings": 19267861,
    "n_dropped": 74,
    "df_quantiles": {
     "p50": 1,
@@ -471,12 +472,12 @@
     "p99": 208,
     "max": 51591
    },
-   "bytes": 87207492,
-   "wall_s": 66.7
+   "bytes": 87207884,
+   "wall_s": 72.7
   },
   "SP": {
-   "n_keys": 2942386,
-   "n_postings": 42791669,
+   "n_keys": 2942384,
+   "n_postings": 42791294,
    "n_dropped": 30,
    "df_quantiles": {
     "p50": 1,
@@ -484,12 +485,12 @@
     "p99": 165,
     "max": 50640
    },
-   "bytes": 218245612,
-   "wall_s": 72.2
+   "bytes": 218244080,
+   "wall_s": 74.3
   },
   "NC": {
-   "n_keys": 12987894,
-   "n_postings": 31073167,
+   "n_keys": 12987957,
+   "n_postings": 31073207,
    "n_dropped": 22,
    "df_quantiles": {
     "p50": 1,
@@ -497,38 +498,38 @@
     "p99": 12,
     "max": 51256
    },
-   "bytes": 332099668,
-   "wall_s": 95.0
+   "bytes": 332100836,
+   "wall_s": 73.9
   },
   "AT": {
-   "n_keys": 639324,
-   "n_postings": 38757295,
-   "n_dropped": 188,
+   "n_keys": 639323,
+   "n_postings": 38757692,
+   "n_dropped": 189,
    "df_quantiles": {
     "p50": 4,
     "p90": 37,
     "p99": 866,
     "max": 50852
    },
-   "bytes": 165260388,
-   "wall_s": 38.3
+   "bytes": 165261968,
+   "wall_s": 34.1
   },
   "AB": {
-   "n_keys": 7719060,
-   "n_postings": 65236245,
-   "n_dropped": 55,
+   "n_keys": 7720892,
+   "n_postings": 65235785,
+   "n_dropped": 56,
    "df_quantiles": {
     "p50": 2,
     "p90": 8,
     "p99": 82,
-    "max": 50235
+    "max": 50233
    },
-   "bytes": 384450900,
-   "wall_s": 43.7
+   "bytes": 384478380,
+   "wall_s": 37.5
   },
   "XK": {
-   "n_keys": 21309180,
-   "n_postings": 106428095,
+   "n_keys": 21309162,
+   "n_postings": 106429177,
    "n_dropped": 0,
    "df_quantiles": {
     "p50": 1,
@@ -536,8 +537,8 @@
     "p99": 50,
     "max": 12824
    },
-   "bytes": 766659780,
-   "wall_s": 63.0
+   "bytes": 766663820,
+   "wall_s": 63.1
   },
   "SK": {
    "n_keys": 439564,
@@ -550,17 +551,17 @@
     "max": 51494
    },
    "bytes": 65056000,
-   "wall_s": 71.8
+   "wall_s": 58.6
   }
  },
  "at_distinct_tokens": 639512,
- "at_tokens_above_cap": 417,
- "g_at_wall_s": 27.7,
+ "at_tokens_above_cap": 418,
+ "g_at_wall_s": 29.4,
  "peak_rss_mb": {
-  "main": 1169.1,
-  "workers_max": 724.8,
-  "workers_sum": 4092.4
+  "main": 1480.7,
+  "workers_max": 841.1,
+  "workers_sum": 4756.9
  },
- "wall_s": 805.6,
+ "wall_s": 805.2,
  "n_G": 237
 }
