@@ -6,10 +6,14 @@ import json
 import logging
 import multiprocessing
 import os
-import resource
 import subprocess
 import sys
 from pathlib import Path
+
+try:
+    import resource  # POSIX only; peak RSS is reported as NaN on Windows
+except ImportError:
+    resource = None
 
 CODE_DIR = Path(__file__).resolve().parents[2]
 CONFIG_DIR = CODE_DIR / "configs"
@@ -157,6 +161,8 @@ def log_test_usage(what, why, file):
 
 
 def peak_rss_mb():
+    if resource is None:
+        return float("nan")
     rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     return rss / 2**20 if sys.platform == "darwin" else rss / 2**10  # bytes on macOS, KiB on Linux
 

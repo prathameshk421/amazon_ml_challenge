@@ -1,152 +1,256 @@
-# Business Entity Resolution: reproduction guide
+# Business entity resolution: reproduction guide
 
-Pipeline: raw TSVs → text normalization → inverted-index blocking (stage 1) → LightGBM candidate
-re-ranker + cut (stage 2, = `candidate_pairs.tsv`) → LightGBM pair matcher with calibrated
-per-S1 decision (stage 3, = `matching_results.tsv`).
+This folder rebuilds submission 18 (public leaderboard F0.5 0.984075) from the contest TSVs:
 
-Design documents: `plan/BUCKETING_PLAN.md` (stages 1–2) and `plan/MATCHER_PLAN.md` (stage 3) in the
-repository. Every reported number is written by a command into `artifacts/metrics/*.json`.
+| File | Rows | Pairs | sha1 of the submitted file |
+|---|---|---|---|
+| `output/matching_results.tsv` | 1,732,544 S1 (101,788 with no match) | 5,812,655 | `7334635ce65ff93c9b1ca02395f48860e343de49` |
+| `output/candidate_pairs.tsv` | 1,732,544 S1 | 17,546,805 (10.13 per S1) | `8c97a66b9d08ef722d6cf34b2760c963f9c1e3b9` |
 
-## 1. Environment
+The method is described in `Documentation_template.md` at the zip root. This file covers setup, the command to
+run, what each step does, and how long it took.
 
-- Python 3.12 or newer (developed on 3.14.5, macOS arm64). The code only uses spawn-safe
-  multiprocessing, so it also runs on Linux/WSL2 and Windows.
-- `python -m venv .venv && .venv/bin/pip install -r submission/code/business_entity_resolution/requirements.txt`
-- Libraries: numpy, pandas, pyarrow, rapidfuzz (MIT), jellyfish (MIT), scikit-learn (BSD-3),
-  scipy, lightgbm (MIT), tqdm, matplotlib. No pretrained models. No network access is used at any step.
+## 1. Pipeline in one paragraph
 
-## 2. Layout and conventions
+Text normalization (Unicode NFC, romanisation of 9 Indic scripts, accent/case folding, abbreviation maps mined from
+the pool, a transliteration dictionary learned from train pairs) → stage 1: inverted index over 10 hashed key
+families + logistic scoring → stage 2: LightGBM re-ranker and cut (~6.1 candidates per S1) → cross-encoder `c0`
+(LoRA on `BAAI/bge-reranker-v2-m3`) scores every candidate → stage 3: LightGBM pair matcher on 85 features,
+isotonic calibration, threshold 0.73, one-owner → DRACE: nearest-neighbour search with `multilingual-e5-small`
+(untrained and a copy distilled from `c0`), new pairs accepted when `c0` p ≥ 0.995, one-owner → output files.
 
-**Paths.** Commands below are written for the team repository, where this package lives at
-`submission/code/business_entity_resolution/`. In the submission zip it sits at
-`code/business_entity_resolution/`: unzip, put the contest data at `student_resource/dataset/` next to
-`code/`, run from that folder, and read `submission/code/` as `code/` in every command
-(e.g. `export PYTHONPATH=code/business_entity_resolution/src`).
+## 2. Setup
 
-Run every command from the **repository root**, the folder that contains:
+Requirements:
+
+- Python 3.12 or newer (built with CPython 3.14.5).
+- CPU steps: 8 cores and 16 GB RAM were used (Apple M3). About 15 GB of free disk for `work/`.
+- GPU steps: one CUDA GPU. The submission used an NVIDIA A100 80 GB and an H200 for scoring and retrieval, and one
+  T4 16 GB for cross-encoder training. The exact nearest-neighbour search holds 1,024 queries × one country's pool
+  in fp16 at a time (about 13 GB for the India pool); on a smaller GPU set `RETR_QCHUNK=256`.
+- Internet on first use only: `transformers` downloads the two public base models (`BAAI/bge-reranker-v2-m3`,
+  `intfloat/multilingual-e5-small`) from the Hugging Face Hub into its cache. No other network access. After the
+  first download, `HF_HUB_OFFLINE=1` works.
+
+Folder layout. Unzip, then put the contest data next to `code/`, unchanged:
 
 ```
-student_resource/dataset/{train,test}/*.tsv   contest data, unchanged (configs/paths.json: data_root)
-work/                                         intermediate files, created by the pipeline
-artifacts/metrics/                            metrics JSON written by every command
-submission/code/business_entity_resolution/   this package
+<run folder>/                         run every command from here
+  code/business_entity_resolution/    this package
+  student_resource/dataset/train/     train_source{1,2,3}.tsv, train_ground_truth.tsv
+  student_resource/dataset/test/      test_source{1,2,3}.tsv
+  student_resource/utils/             validate_submission.py (optional; used by the last step if present)
 ```
+
+Create the virtual environment and install the pinned packages.
+
+### macOS
 
 ```bash
-export PYTHONPATH=submission/code/business_entity_resolution/src
-python -m ber.cli <command> [args]
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r code/business_entity_resolution/requirements.txt
 ```
 
-`configs/blocking.json` holds the stage 1–2 settings, including values tuned by experiments E0–E6
-(each recorded under `tuned_by`). `configs/match.json` holds the stage-3 settings. Worker count
-defaults to `min(max_workers, cpu_count - 2)`.
+`torch` on macOS has no CUDA. The GPU steps fall back to Apple MPS or CPU, which is too slow for the ~22 million
+cross-encoder pairs; run the GPU steps on a Linux CUDA machine (section 4) or use `--models shipped`.
 
-## 3. Data split (fixed; see `student_resource/dataset/split.md`)
+### Linux
 
-`splits` rebuilds the S1 train / validation split from the training ground truth: seed 42, strata
-country × singleton, 20% to validation. It reproduces `data/write_s1_split.py` exactly. Train S1 is
-then cut into disjoint work slices (seed 20260925):
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install torch==2.14.0 --index-url https://download.pytorch.org/whl/cu128
+pip install -r code/business_entity_resolution/requirements.txt
+```
 
-| Slice | Used for |
+Pick the `--index-url` that matches the installed CUDA driver (`cu126`, `cu128`, …).
+
+### Windows (PowerShell)
+
+```powershell
+py -3 -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install torch==2.14.0 --index-url https://download.pytorch.org/whl/cu128
+pip install -r code\business_entity_resolution\requirements.txt
+```
+
+Not run on Windows by us. The code uses spawn-based multiprocessing and guards the one POSIX-only import
+(`resource`), but no step has been executed there. WSL2 with Ubuntu and the Linux commands is the closer match to
+what was run.
+
+## 3. Run
+
+One command runs every step in order. Output of each step is printed and appended to `logs/<step>.log`.
+
+macOS / Linux:
+
+```bash
+python code/business_entity_resolution/src/reproduce.py
+```
+
+Windows (PowerShell):
+
+```powershell
+python code\business_entity_resolution\src\reproduce.py
+```
+
+Options (same on every OS):
+
+| Option | Effect |
 |---|---|
-| DEV_A, DEV_B | stage-1 tuning / confirmation |
-| S1R_TRAIN | stage-1 logistic model |
-| RR_TRAIN, RR_CAL | stage-2 re-ranker training / cut |
-| MATCH_TRAIN (180,000) | stage-3 fit, calibration, decision rule (5-fold out-of-fold) |
-| MATCH_VALID (20,000) | stage-3 confirmation, once |
-| HOLDOUT_TEST = validation S1 (441,363) | headline score only, once per stage |
+| `--list` | print the steps and exit |
+| `--models shipped` | copy the trained models from `models/` into `work/` and skip every step marked `train` |
+| `--from STEP` / `--to STEP` | run a contiguous range, e.g. resume after a failure |
+| `--only STEP1,STEP2` | run only these steps |
 
-S2 and S3 are never split: every query searches the full pool. Validation-S1 labels are read only by
-scoring commands (`rerank-eval --set HOLDOUT_TEST`, `match-eval --set HOLDOUT_TEST`).
+Two ways to run:
 
-## 4. Full reproduction (data → blocking → matching → output)
+- `--models train` (default): trains every model from the training data. This is how the submission was built.
+- `--models shipped`: inference on test with the models the submission used. Runs the `data` steps only.
 
-Times are measured on an 8-core M3 with 6 workers unless marked "est.".
-
-| Step | Commands | Time |
-|---|---|---|
-| P1 ingest + split | `ingest --split train`; `ingest --split test`; `splits` | ~10 min (est.) |
-| P2 normalization | `mine-abbrev --split train`; `normalize --split train --no-dict`; `learn-dict`; `normalize --split train` | ~45 min (est.) |
-| P3 train index | `build-index --split train`; `index-sanity --split train` | 805 s |
-| P4 stage-1 model | `stage1-train` | ~35 s |
-| P5 stage-2 re-ranker | `rerank-build`; `rerank-train`; `rerank-cut` | build 169 s, train 69 s |
-| P6 test side | `mine-abbrev --split test`; `normalize --split test`; `build-index --split test`; `index-sanity --split test` | ~15 min |
-| P6 candidates | `candidates --set MATCH_TRAIN` (938 s); `candidates --set MATCH_VALID` (175 s); `rerank-eval --set HOLDOUT_TEST` (1,832 s, scores val-S1 once); `candidates --set TEST` (~2 h est.) | |
-| P6 outputs | `write-outputs` (writes `work/outputs/candidate_pairs.tsv` + streaming validation); `monitor` | |
-| Stage 3 | `bash submission/code/business_entity_resolution/run_matcher.sh` (section 5) | ~30 min (est.) |
-
-The E0–E6 experiment commands (`abbrev-e0`, `s1-eval --exp ...`) are needed only to re-derive the
-tuned values already stored in `configs/blocking.json`. `rerank-cut` re-derives the stored cut from
-RR_CAL deterministically.
-
-## 5. Stage 3: matcher
-
-`run_matcher.sh` runs, in order:
-
-| Step | Command | Output |
-|---|---|---|
-| M1 | `match-features --set MATCH_TRAIN` / `--set MATCH_VALID` | `work/match/features/<SET>/part-*.parquet` (no labels stored) |
-| M2 | `match-train` | 5 fold models, isotonic calibration, decision rule → `work/match/models/`; `artifacts/metrics/match_train.json`; `reports/match_errors/*.csv` |
-| M3 | `match-eval --set MATCH_VALID` | `artifacts/metrics/match_eval_MATCH_VALID.json` (confirmation; nothing is tuned on it) |
-| M4 | `match-features --set TEST` | test features (inputs only) |
-| M5 | `match-predict` | `work/outputs/matching_results.tsv` + format / subset check, `artifacts/metrics/match_predict_TEST.json` |
-| M6 (once, by hand) | `match-eval --set HOLDOUT_TEST` | headline val-S1 F0.5 → `artifacts/metrics/match_eval_HOLDOUT_TEST.json`. It refuses to run twice unless `--force` is given |
-
-What `match-train` does:
-
-- It trains LightGBM (binary logloss, no class reweighting; the positive rate inside candidate lists is
-  0.62) with GroupKFold by S1 (5 folds). Each fold early-stops on 10% of its own training S1.
-- It fits isotonic calibration on the out-of-fold predictions.
-- On the out-of-fold predictions it picks one decision rule:
-  - a global threshold on calibrated p, or
-  - per-S1 expected-F0.5-optimal top-k (exact, from Poisson-binomial distributions).
-- Either rule can add the one-owner filter: a pool record is kept only for the S1 that gives it the
-  highest p. This uses the ground-truth fact that no pool record has two owners, and reads only inputs.
-- At inference it averages the 5 fold models and applies the stored calibration and rule.
-
-Features (50): the stage-2 score and rank; name similarity on normalized text (rapidfuzz ratios,
-Jaro-Winkler, IDF-weighted token overlap from pool document frequency, missing-rare-token IDF,
-equality after removing data-mined edge tokens, acronym, consonant skeleton); address similarity
-and number agreement (house number, shared / conflicting numbers of ≥ 3 digits, numeric Jaccard);
-country same / different / unknown (no country one-hot); and list context per S1 (score gaps,
-rank among the S1's candidates, how many candidates look alike). Missing information is NaN, never 0.
-
-### Matcher only (e.g. on another machine)
-
-Copy the repository and create the venv. Then copy these bucketing outputs into `work/`, keeping the
-same paths (about 3.8 GB, plus `candidates/TEST` once it exists):
-
-```
-work/candidates/{MATCH_TRAIN,MATCH_VALID,HOLDOUT_TEST,TEST}/
-work/records/
-work/norm/{train,test}_s1.parquet  work/norm/{train,test}_s1_chain.npy
-work/norm/{train,test}_pool_store/
-work/index/{train,test}/meta.json  work/index/{train,test}/{NT,AT}.*.npy
-work/splits/
-work/rerank/model_v1.txt  work/rerank/model_v1_meta.json
-```
-
-Also copy `student_resource/` (for validation). Then run `bash submission/code/business_entity_resolution/run_matcher.sh`.
-
-A fingerprint of the stage-2 model and cut is stored with every feature set and with the trained
-matcher. If the bucketing outputs change, `match-train`, `match-eval` and `match-predict` refuse to
-run until features are rebuilt.
-
-## 6. Packaging the submission
+Run the CPU steps on one machine and the GPU steps on another by copying `work/` between them, for example:
 
 ```bash
-mkdir -p submission/output
-cp work/outputs/candidate_pairs.tsv work/outputs/matching_results.tsv submission/output/
-python student_resource/utils/validate_submission.py --matching submission/output/matching_results.tsv --test-dir student_resource/dataset/test
-python submission/code/business_entity_resolution/src/ber/validate_stream.py --candidate submission/output/candidate_pairs.tsv --test-dir student_resource/dataset/test
+python code/business_entity_resolution/src/reproduce.py --to ce_pairs_test
 ```
 
-The official validator also accepts `--candidate`, but it holds every candidate ID in Python sets,
-which can take several GB of RAM. `validate_stream.py` applies the same rules to the candidate file
-in a streaming pass.
-
-## 7. Tests
+then, on the GPU machine with the same `work/`:
 
 ```bash
-cd submission/code/business_entity_resolution && PYTHONPATH=src python -m unittest discover -s tests
+python code/business_entity_resolution/src/reproduce.py --from ce_train
 ```
+
+On Windows use the same arguments with `code\business_entity_resolution\src\reproduce.py`.
+
+## 4. Steps
+
+`kind`: `data` steps run in both modes; `train` steps are skipped with `--models shipped`. Times are measured on
+the machines named in section 2 unless marked "est.". "A100" means one NVIDIA A100 80 GB.
+
+| # | Step | Kind | Device | What it does | Time |
+|---|---|---|---|---|---|
+| 1 | `ingest` | data | CPU | read the 7 TSVs into parquet; S1 train/validation split (seed 42, strata country × singleton, 20% validation) and work slices | 1.2 min |
+| 2 | `normalize` | data | CPU | mine abbreviation maps (train pool, test pool); normalize; learn the transliteration dictionary from train pairs | ~10 min (est.) |
+| 3 | `index_train` | train | CPU | stage-1 inverted index of the train pool (S2 + S3) | 13.4 min |
+| 4 | `index_test` | data | CPU | stage-1 inverted index of the test pool | 10.1 min |
+| 5 | `stage1` | train | CPU | logistic model over per-key-family scores | 0.6 min |
+| 6 | `stage2` | train | CPU | LightGBM re-ranker on 35 features; cut (rank ≤ 5, or p ≥ 0.05 up to rank 60) | 4 min |
+| 7 | `candidates_train` | train | CPU | candidate lists and 68 pair features for MATCH_TRAIN, MATCH_VALID, DEV_REST_180K, DEV_REST_REST | ~2.5 h (est.) |
+| 8 | `candidates_test` | data | CPU | candidate lists (10,613,056 pairs) and features for test | 2.35 h + 13 min |
+| 9 | `ce_pairs_train` | train | CPU | "name \| address" text pairs for the cross-encoder; DEV_REST_REST fold-1 subset | ~10 min (est.) |
+| 10 | `ce_pairs_test` | data | CPU | same for test | ~5 min (est.) |
+| 11 | `ce_train` | train | GPU | `c0`: the `ce_rec` LoRA adapter continued 1 epoch on DEV_REST_REST fold 0 (3,285,477 pairs, lr 5e-5, batch 32, fp16) | 6.5 h on one T4 |
+| 12 | `ce_score_train` | train | GPU | `c0` p for MATCH_VALID (stops if AUC < 0.99), MATCH_TRAIN, DEV_REST_REST fold 1 (3,459,853 pairs) | fold 1: 60 min on one L4; others not recorded |
+| 13 | `ce_score_test` | data | GPU | `c0` p for the 10.6M test candidate pairs | 49 min on A100 |
+| 14 | `matcher_s9` | train | CPU | LightGBM `full_c0` (68 features + `c0` p). Its test predictions are the seeds of copy expansion and the groups of step 18 | 4 min |
+| 15 | `predict_s9` | data | CPU | `full_c0` on test → `work/outputs/full_c0/` | ~3 min |
+| 16 | `rev_train` | train | GPU | reverse-name retrieval: each name-only pool candidate's 20 nearest S1 names (e5, same country) → 7 features | not recorded |
+| 17 | `rev_test` | data | GPU | same for test | not recorded |
+| 18 | `grp_train` / `grp_test` | train / data | CPU | 5-fold first-pass decisions on training rows; 6 group-profile features (candidate vs. records already accepted for the same S1) | 15.2 min / 3.2 min |
+| 19 | `matcher_s12` | train | CPU | LightGBM `full_c0_rgrp`, 85 features, 3,864,095 fit rows, best iteration 1,190 of 12,000 | 4.8 min |
+| 20 | `predict_s12` | data | CPU | test predictions at threshold 0.70 (base of the submission-13 file) and 0.73 (base of the final file) | ~7 min |
+| 21 | `drace_untrained` | data | GPU | e5 embeddings of 10.0M pool records and 7.5M queries; S1 top 5 and top 5 around every `full_c0` acceptance; new pairs scored by `c0` | 35 min + 8 min on A100 |
+| 22 | `distill` | train | GPU | e5-small fine-tuned on 435,454 triplets from DEV_REST_REST fold 1: in-batch InfoNCE + MarginMSE against `c0` | 7 min on A100 |
+| 23 | `drace_distilled` | data | GPU | distilled-e5 S1 top 10; copy expansion ranks 3-5; `c0` scores for 5.2M new pairs | ~13 min retrieval + ~12 min scoring on H200 (est. from the per-job logs) |
+| 24 | `merge` | data | CPU | matcher pairs + DRACE pairs with `c0` p ≥ 0.995, one-owner; writes `output/`; official validator; sha1 | ~5 min |
+
+Step 23 builds its pair sets in the order the submissions added them (submission 12: distilled ranks 1-2; 13: ranks
+3-5; 14: copy-expansion ranks 3-5, excluding pool records the submission-13 file assigns; 17: ranks 6-7; 18: ranks
+8-10). It computes the top 10 once and takes the rank bands from that file; the original runs retrieved top 2, 5, 7
+and 10 in four separate jobs with the same model and exact search.
+
+Main intermediate files (under `work/`):
+
+| Path | Content |
+|---|---|
+| `records/`, `norm/`, `index/` | parsed records, normalized text, stage-1 postings |
+| `candidates/<SET>/`, `match/features/<SET>/` | candidate lists and pair features per set |
+| `ce/pairs_<SET>.parquet`, `ce/ce_rec_c0/<SET>.parquet` | cross-encoder inputs and scores |
+| `retrieval/` | e5 top-k files, reverse-name and group features, `e5_distil/` |
+| `match/runs/<run>/models/` | LightGBM matchers (`matcher.json` = features, calibration, decision rule) |
+| `outputs/<run>/matching_results.tsv` | matcher-only test predictions |
+
+## 5. Shipped models (`models/`)
+
+| Folder | Model | Produced by |
+|---|---|---|
+| `stage1/` | stage-1 logistic model (JSON) | step `stage1` |
+| `rerank/` | stage-2 LightGBM re-ranker + cut | step `stage2` |
+| `ce_rec_adapter/` | `ce_rec`: LoRA r 16, α 32, dropout 0.05 on query/key/value + classifier head of `BAAI/bge-reranker-v2-m3`; 1 epoch on 971,466 DEV_REST_180K pairs | a teammate's training script, **not in this package** (see below) |
+| `ce_rec_c0_adapter/` | `c0`: `ce_rec` continued on DEV_REST_REST fold 0; MATCH_VALID AUC 0.99896, logloss 0.0402 | step `ce_train` |
+| `matcher/full_c0/` | LightGBM, 69 features (submission 9) | step `matcher_s9` |
+| `matcher/full_c0_rgrp/` | LightGBM, 85 features, threshold 0.70 (step 20 writes the 0.73 copy) | step `matcher_s12` |
+
+`ce_rec` is the starting point of step 11 in both modes. It was trained outside this code base (log: 60,717 steps
+of batch 16, held-out AUC 0.9986); `src/ce/train.py --mode lora` is the closest script here but uses dropout 0.1,
+also adapts the `dense` layers and saves merged weights, so it does not reproduce `ce_rec`.
+
+The distilled retriever `e5_distil` (118M parameters) is not in the zip because of its size; step `distill` trains
+it again.
+
+## 6. What is expected to match exactly
+
+- CPU steps use fixed seeds; LightGBM runs with `deterministic=true, force_row_wise=true`, which gives the same
+  model for the same data, parameters and thread count. The thread count is `min(14, cores − 2)`; the submission
+  used 6 (8-core machine). A different thread count can change the LightGBM trees slightly.
+- GPU steps are not bit-deterministic. bf16 matrix products differ slightly between GPU models and library versions,
+  so a rerun of `ce_train`, `distill` or the retrievals can move scores near the 0.995 admission threshold and change
+  a small number of pairs. With `--models shipped` only scoring and retrieval run on the GPU.
+- Not done for this package: a clean end-to-end rerun from an empty folder. The final `merge` step was rerun from the
+  existing intermediate files and reproduced `matching_results.tsv` with the sha1 above.
+
+## 7. Code map
+
+```
+src/reproduce.py            the step list above; runs each command, writes logs/<step>.log
+src/ber/                    stages 1-3: python -m ber.cli <command>
+  ingest.py, splits.py        TSV → parquet, S1 split and work slices
+  textnorm.py, translit.py, translit_dict.py, abbrev_mine.py   normalization
+  keys.py, index_build.py, index_store.py, hashing.py          stage-1 key families and postings
+  retrieve.py, stage1_model.py, rerank.py, run_candidates.py   stage 1 query, stage 2 re-ranker and cut
+  match.py, exp.py            68 pair features, extra feature groups (cex_p, rev, nfreq, grp_full), LightGBM, decision
+  write_outputs.py, validate_stream.py, evaluate.py, monitor.py, io_utils.py, cli.py
+src/ce/                     cross-encoder
+  prepare_pairs.py            pair files in feature-row order
+  train_continue.py, train.py, common.py   LoRA training (c0), shared scoring helpers
+  hf_job/score_job.py         c0 scoring (local mode: CE_LOCAL=work)
+  hf_job/retrieve_job.py      e5 embeddings + per-country exact top-k (local mode: RETR_LOCAL=work)
+  hf_job/distill_job.py       e5 distillation (local mode: D_LOCAL=work)
+  hf_job/ann_search.py, hf_job/collect.py   FAISS variant (not used in the submission), Hub download of scores
+src/pipeline/               stage-3 feature groups, matcher training, DRACE
+  build_dev_rest.py, dev_rest_180k.py, dev_rest_full.py, split_rest_folds.py   extra training slices
+  rev_prep.py, firstpass_oof.py, grp_feats.py   ownership features
+  train_final_comp.py         final LightGBM training (fit 85% / early stop 5% / calibration 10% of S1)
+  drace_test.py, seed5_test_pairs.py, distill_e5.py   DRACE pairs, merge, distillation triplets
+configs/                    blocking.json (stage 1-2 settings), match.json (LightGBM and decision settings), paths.json
+tests/                      unit tests for stages 1-3
+```
+
+The `hf_job/*.py` scripts also run as Hugging Face Jobs (how the submission's GPU work was run); the local modes
+execute the same model code without the Hub.
+
+## 8. Tests
+
+macOS / Linux:
+
+```bash
+cd code/business_entity_resolution
+PYTHONPATH=src python -m unittest discover -s tests
+```
+
+Windows (PowerShell):
+
+```powershell
+cd code\business_entity_resolution
+$env:PYTHONPATH = "src"
+python -m unittest discover -s tests
+```
+
+## 9. Validation data use
+
+- Train S1 is split 80/20 (seed 42). The 20% (441,363 S1) is read only by scoring commands.
+- Inside the 80%, each slice has one role: stage-1 tuning (DEV_A, DEV_B), stage-1 model (S1R_TRAIN), re-ranker (RR_TRAIN,
+  RR_CAL), `ce_rec` (DEV_REST_180K), `c0` (DEV_REST_REST fold 0), matchers and e5 distillation (MATCH_TRAIN,
+  MATCH_VALID, DEV_REST_REST fold 1). A matcher never trains on rows whose `c0` score is in-sample.
+- S2 and S3 are never split. Test has no labels; test files are read as inputs only.

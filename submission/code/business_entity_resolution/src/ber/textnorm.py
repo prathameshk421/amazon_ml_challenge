@@ -5,10 +5,14 @@ import collections
 import json
 import os
 import re
-import resource
 import sys
 import time
 import unicodedata
+
+try:
+    import resource  # POSIX only
+except ImportError:
+    resource = None
 
 import numpy as np
 import pyarrow as pa
@@ -267,6 +271,8 @@ def _load_abbrev(split, cfg, no_abbrev):
 
 
 def _children_peak_rss_mb():
+    if resource is None:
+        return float("nan")
     rss = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
     return rss / 2**20 if sys.platform == "darwin" else rss / 2**10
 

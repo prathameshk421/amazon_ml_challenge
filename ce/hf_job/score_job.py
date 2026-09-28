@@ -7,6 +7,9 @@ uploading each chunk back to REPO as soon as it is written, so a timeout keeps f
 MATCH_VALID runs first and is a gate: AUC < MIN_AUC stops the job before TEST (input-format mismatch).
 
   hf jobs run --flavor a100-large --timeout 1h50m --secrets HF_TOKEN <image> bash -c "... python score_job.py"
+
+Local mode (no Hub access; same model code): CE_LOCAL=<work dir> CE_ADAPTER=<adapter dir> CE_NAME=ce_rec_c0
+reads <work>/ce/pairs_<SET>.parquet and writes <work>/ce/<CE_NAME>/<SET>.parquet (the file collect.py would write).
 """
 import os
 import sys
@@ -30,10 +33,19 @@ MAX_LEN = 128
 MIN_AUC = 0.99
 TOKENS_PER_BATCH = int(os.environ.get("CE_TOKENS_PER_BATCH", "131072"))
 
-api = HfApi()
-root = Path(snapshot_download(REPO, repo_type="dataset", local_dir="/tmp/ce_in",
-                              allow_patterns=[f"pairs_{s}.parquet" for s in SETS] + [f"{ADAPTER}/*", "common.py"]))
-sys.path.insert(0, str(root))
+LOCAL = os.environ.get("CE_LOCAL")  # work dir: local run, nothing is downloaded or uploaded
+CE_NAME = os.environ.get("CE_NAME", "ce_rec_c0")
+if LOCAL:
+    api = None
+    root = Path(LOCAL) / "ce"
+    adapter_dir = Path(ADAPTER)
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # ce/common.py
+else:
+    api = HfApi()
+    root = Path(snapshot_download(REPO, repo_type="dataset", local_dir="/tmp/ce_in",
+                                  allow_patterns=[f"pairs_{s}.parquet" for s in SETS] + [f"{ADAPTER}/*", "common.py"]))
+    adapter_dir = root / ADAPTER
+    sys.path.insert(0, str(root))
 import common  # noqa: E402
 from peft import PeftModel  # noqa: E402
 from transformers import AutoModelForSequenceClassification, AutoTokenizer  # noqa: E402
@@ -42,7 +54,7 @@ dev = common.device()
 print(f"device {dev} {torch.cuda.get_device_name() if dev.type == 'cuda' else ''}", flush=True)
 tok = AutoTokenizer.from_pretrained(BASE)
 model = AutoModelForSequenceClassification.from_pretrained(BASE, num_labels=1, dtype=torch.float32)
-model = PeftModel.from_pretrained(model, str(root / ADAPTER)).merge_and_unload()
+model = PeftModel.from_pretrained(model, str(adapter_dir)).merge_and_unload()
 bf16 = dev.type == "cuda" and torch.cuda.is_bf16_supported()
 model = model.to(torch.bfloat16 if bf16 else torch.float32).to(dev).eval()
 print(f"model ready, dtype {next(model.parameters()).dtype}", flush=True)
@@ -51,6 +63,8 @@ uploads = []
 
 
 def upload(local, remote):
+    if LOCAL:
+        return
     th = threading.Thread(target=lambda: api.upload_file(path_or_fileobj=str(local), path_in_repo=remote,
                                                          repo_id=REPO, repo_type="dataset",
                                                          commit_message=f"scores {remote}"))
@@ -71,7 +85,7 @@ for set_name in SETS:
     has_label = "label" in pq.read_schema(src).names  # test-side sets carry no labels
     cols = ["s1_idx", "pool_idx", "text_a", "text_b"] + (["label"] if has_label else [])
     table = pq.read_table(src, columns=cols)
-    out_dir = Path("/tmp/scores") / set_name
+    out_dir = (root / CE_NAME / "_chunks" / set_name) if LOCAL else (Path("/tmp/scores") / set_name)
     out_dir.mkdir(parents=True, exist_ok=True)
     labels, preds = [], []
     t_set = time.time()
@@ -96,6 +110,13 @@ for set_name in SETS:
               flush=True)
         if "label" in cols:
             labels.append(t.column("label").to_numpy()); preds.append(p)
+    if LOCAL:  # same assembly as collect.py: chunks in order, row order checked against the pair file
+        t = pa.concat_tables([pq.read_table(p) for p in sorted(out_dir.glob("c*.parquet"))])
+        for c in ("s1_idx", "pool_idx"):
+            if not np.array_equal(t.column(c).to_numpy(), table.column(c).to_numpy()):
+                raise RuntimeError(f"{set_name}: {c} order differs from pairs_{set_name}.parquet")
+        pq.write_table(t, root / CE_NAME / f"{set_name}.parquet", compression="zstd")
+        print(f"wrote {root / CE_NAME / f'{set_name}.parquet'}: {t.num_rows:,} rows", flush=True)
     if labels:
         a = auc(np.concatenate(labels).astype(int), np.concatenate(preds))
         print(f"[{set_name}] AUC {a:.5f}", flush=True)

@@ -135,16 +135,21 @@ def main():
     print(f">>> held-out F0.5 {f05:.5f} on {q_cal.size} S1 (decision {decision}; p_rerank floor {floor[floor_t]:.5f})",
           flush=True)
 
-    # paired comparison with the live full_single model on the SAME calibration S1 (its own calibration + rule)
+    # paired comparison with the live full_single model on the SAME calibration S1 (its own calibration + rule);
+    # reporting only, skipped when that model is absent (it does not change this run's model or decision)
     fs_dir = match.runs_dir("full_single") / "models"
-    fs_doc = io_utils.read_json(fs_dir / "matcher.json")
-    if fs_doc["features_used"] != base:
-        raise RuntimeError("full_single feature list differs from used_features()")
-    fs_b = lgb.Booster(model_file=str(fs_dir / "model_fold0.txt"))
-    fs_p = match.calibrate(fs_b.predict(X[in_cal][:, base_cols]), fs_doc["calibration"])
-    fs_f = scorer.per_entity(match.apply_decision(fs_doc["decision"], s1_c, pool_c, fs_p))[0]
-    vs_fs = match.paired_delta(per_entity, fs_f, n_boot=2000)
-    print(f">>> full_single on the same slice {fs_f.mean():.5f}; full_comp - full_single {vs_fs}", flush=True)
+    vs_fs, fs_mean = None, None
+    if (fs_dir / "matcher.json").exists():
+        fs_doc = io_utils.read_json(fs_dir / "matcher.json")
+        if fs_doc["features_used"] != base:
+            raise RuntimeError("full_single feature list differs from used_features()")
+        fs_b = lgb.Booster(model_file=str(fs_dir / "model_fold0.txt"))
+        fs_p = match.calibrate(fs_b.predict(X[in_cal][:, base_cols]), fs_doc["calibration"])
+        fs_f = scorer.per_entity(match.apply_decision(fs_doc["decision"], s1_c, pool_c, fs_p))[0]
+        vs_fs, fs_mean = match.paired_delta(per_entity, fs_f, n_boot=2000), float(fs_f.mean())
+        print(f">>> full_single on the same slice {fs_mean:.5f}; {RUN} - full_single {vs_fs}", flush=True)
+    else:
+        print(f">>> {fs_dir} absent: paired comparison with full_single skipped", flush=True)
 
     rd = match.runs_dir(RUN) / "models"
     rd.mkdir(parents=True, exist_ok=True)
@@ -163,7 +168,7 @@ def main():
         "num_boost_round": NUM_BOOST_ROUND, "truncated": bool(truncated), "holdout_f05": f05,
         "decision": decision, "rule_comparisons": {"expected_f_vs_threshold": ef, "one_owner": oo},
         "floor": {"threshold": floor_t, "f05": floor[floor_t]}, "vs_full_single_same_slice": vs_fs,
-        "full_single_same_slice_f05": float(fs_f.mean()), "wall_s": round(time.time() - t0, 1)},
+        "full_single_same_slice_f05": fs_mean, "wall_s": round(time.time() - t0, 1)},
         int(q_cal.size), int(scorer.n_true.sum()), cfg)
     print(f">>> saved {rd} (NOT copied to the live dir). total {time.time()-t0:.0f}s", flush=True)
 

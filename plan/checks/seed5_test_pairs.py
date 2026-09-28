@@ -2,8 +2,11 @@
 in the candidate lists, pairs already scored (DRACE/DRACD/DRACD5), and pool records S13 already assigns (base or DRACE).
 Writes work/ce/pairs_SEED5_TEST.parquet + work/retrieval/seed5_test_meta.parquet (cos, seed_rank for prioritising).
 
-  PYTHONPATH=submission/code/business_entity_resolution/src:ce:plan/checks .venv/bin/python plan/checks/seed5_test_pairs.py
+  PYTHONPATH=submission/code/business_entity_resolution/src:ce:plan/checks .venv/bin/python plan/checks/seed5_test_pairs.py \
+      [--s13 submission/output_v13/matching_results.tsv]
 """
+import argparse
+
 import numpy as np
 import pandas as pd
 import pyarrow as pa
@@ -13,7 +16,7 @@ from drace_test import R, SEED_BASE, key, read_results, test_candidates
 from prepare_pairs import record_text
 
 
-def main():
+def main(s13_path):
     top = pq.read_table(R / "drace_test_topk.parquet").to_pandas()
     top = top[(top.qid >= SEED_BASE) & (top["rank"] >= 3)]
     seeds = pd.read_parquet(R / "drace_test_seeds.parquet")
@@ -22,7 +25,7 @@ def main():
     cand = test_candidates()
     old = pd.concat([pd.read_parquet(R / f)[["s1_idx", "pool_idx"]] for f in
                      ("drace_test_meta.parquet", "dracd_test_meta.parquet", "dracd5_test_meta.parquet")])
-    s13, _ = read_results("submission/output_v13/matching_results.tsv")
+    s13, _ = read_results(s13_path)
     kk = key(m.s1_idx, m.pool_idx)
     n0 = len(m)
     m = m[~np.isin(kk, key(cand.s1_idx, cand.pool_idx)) & ~np.isin(kk, key(old.s1_idx, old.pool_idx))
@@ -41,4 +44,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--s13", default="submission/output_v13/matching_results.tsv",
+                    help="S13 matching_results.tsv (its assigned pool records are excluded)")
+    main(ap.parse_args().s13)

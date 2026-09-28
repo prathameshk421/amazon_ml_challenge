@@ -13,6 +13,7 @@ ANN (pip install faiss-cpu==1.15.1; ann_search.py is fetched from REPO next to t
   RETR_COMPARE=1            also run the exact search on the same embeddings -> <OUT_TAG>_exact_topk.parquet, and
                             <OUT_TAG>_ann_stats.json (recall / queries whose top-c set differs, per country)
   RETR_ANN_ARGS="--ef 512"  extra ann_search.py flags
+Local run (no Hub access): RETR_LOCAL=work reads/writes work/retrieval/; RETR_MODEL_DIR is then a local model dir.
 Model: intfloat/multilingual-e5-small (MIT). Text is "query: <name> | <address>" on both sides (symmetric task, e5 card);
 mean pooling over the attention mask, L2-normalised.
 """
@@ -53,6 +54,8 @@ from ann_search import Rows  # noqa: E402  (imports faiss lazily; safe next to t
 t_job = time.time()
 if LOCAL:
     root = Path(LOCAL)
+    if MODEL_DIR:  # local mode: RETR_MODEL_DIR is a directory on disk (e.g. work/retrieval/e5_distil)
+        MODEL = MODEL_DIR
 else:
     from huggingface_hub import snapshot_download
     root = Path(snapshot_download(REPO, repo_type="dataset", local_dir="/tmp/retr_in",

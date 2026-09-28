@@ -1,6 +1,9 @@
 """HF Job: distil c0 into multilingual-e5-small (triplets from plan/checks/distill_e5.py --dump), save the model to the
 dataset repo as e5_distil/, then run retrieve_job.py on the gate-1 MATCH_TRAIN inputs with it (output gate1_distil_topk).
 
+Local mode (no Hub access): D_LOCAL=work reads work/retrieval/e5_distil_triplets.parquet, saves the model to
+work/retrieval/e5_distil/ and stops (no upload, no gate-1 retrieval).
+
 Loss per batch (mean pooling, L2 norm, same as retrieve_job.py): InfoNCE over the batch (q vs every pos and neg, t 0.05)
 + LAM * MarginMSE(cos(q,pos) - cos(q,neg), p_c0(pos) - p_c0(neg)). bf16 autocast on CUDA.
 """
@@ -20,10 +23,14 @@ from transformers import AutoModel, AutoTokenizer
 REPO = "prathameshk421/ber-ce-scoring"
 BASE = "intfloat/multilingual-e5-small"
 BATCH, LR, EPOCHS, LAM = int(os.environ.get("D_BATCH", "128")), float(os.environ.get("D_LR", "2e-5")), 1.0, 1.0
-OUT = Path("/tmp/e5_distil")
+LOCAL = os.environ.get("D_LOCAL")
+OUT = Path(LOCAL) / "retrieval" / "e5_distil" if LOCAL else Path("/tmp/e5_distil")
 
 t0 = time.time()
-tp = Path(hf_hub_download(REPO, "retrieval/e5_distil_triplets.parquet", repo_type="dataset", local_dir="/tmp/d_in"))
+if LOCAL:
+    tp = Path(LOCAL) / "retrieval" / "e5_distil_triplets.parquet"
+else:
+    tp = Path(hf_hub_download(REPO, "retrieval/e5_distil_triplets.parquet", repo_type="dataset", local_dir="/tmp/d_in"))
 t = pq.read_table(tp).to_pandas()
 dev = torch.device("cuda")
 tok = AutoTokenizer.from_pretrained(BASE)
@@ -70,6 +77,9 @@ tok.save_pretrained(OUT)
 json.dump({"base": BASE, "triplets": len(t), "batch": BATCH, "lr": LR, "epochs": EPOCHS, "lam": LAM,
            "train_set": "DEV_REST_REST fold 1 S1 (disjoint from MATCH_TRAIN); teacher ce_rec_c0 p_ce",
            "log": log}, open(OUT / "train_meta.json", "w"), indent=1)
+if LOCAL:
+    print(f"model saved to {OUT} ({time.time() - t0:.0f}s)", flush=True)
+    sys.exit(0)
 HfApi().upload_folder(folder_path=str(OUT), path_in_repo="e5_distil", repo_id=REPO, repo_type="dataset",
                       commit_message="e5 distilled from c0")
 print(f"model saved to {REPO}/e5_distil ({time.time() - t0:.0f}s); running gate-1 retrieval", flush=True)

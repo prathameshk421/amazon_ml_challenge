@@ -1,3 +1,5 @@
+# Python 3.12+ (built and run with CPython 3.14.5). Versions are the ones the submission was built with.
+# CPU steps (ingest, normalization, blocking, LightGBM stages)
 numpy==2.5.3
 pandas==3.0.6
 pyarrow==25.0.1
@@ -6,5 +8,12 @@ jellyfish==1.2.1
 scikit-learn==1.9.1
 scipy==1.18.1
 lightgbm==4.7.0
-tqdm==4.70.1
-matplotlib==3.11.2
+# GPU steps (cross-encoder, e5 retrieval, e5 distillation). On Linux/Windows install the CUDA build of torch,
+# see README section 2. The GPU runs of the submission used torch 2.6.0 + CUDA 12.4 with the versions below.
+torch==2.14.0
+transformers==5.17.0
+tokenizers==0.23.2
+safetensors==0.8.0
+peft==0.21.0
+accelerate==1.15.0
+huggingface_hub==1.33.0

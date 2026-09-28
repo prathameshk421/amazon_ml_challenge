@@ -102,7 +102,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sets", nargs="+", default=list(SETS), choices=SETS)
     args = ap.parse_args()
-    overlap = overlap_checks()
+    overlap = overlap_checks() if set(args.sets) - {"TEST"} else "skipped (TEST only)"
     print("overlap", overlap, flush=True)
     splits_needed = {"test" if s == "TEST" else "train" for s in args.sets}
     texts = {sp: (record_text(sp, "s1"), record_text(sp, "pool")) for sp in sorted(splits_needed)}

@@ -8,6 +8,9 @@ list or whose pool record the base already assigns; add a pair when c0 p_ce >= T
   ... drace_test.py pairs [--k1 5 --k2 2]                     -> work/ce/pairs_DRACE_TEST.parquet
   (HF) score_job.py CE_SETS=MATCH_VALID,DRACE_TEST, collect   -> work/ce/ce_rec_c0/DRACE_TEST.parquet
   ... drace_test.py merge [--t 0.995]                         -> submission/output_v10/{matching_results,candidate_pairs}.tsv
+  ... drace_test.py s1_queries                                -> work/retrieval/dracd_test_s1_queries.parquet
+  (GPU) retrieve_job.py RETR_TAG=drace_test RETR_QUERY_TAG=dracd_test_s1 RETR_MODEL_DIR=<e5_distil> RETR_K=10
+        RETR_OUT_TAG=dracd10_test; then pairs_extra per rank band (DRACD k1 2, DRACD5 5, DRACD7 7, DRACD10 10)
 """
 import argparse
 from pathlib import Path
@@ -15,6 +18,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pyarrow as pa
+import pyarrow.compute  # noqa: F401  (pa.compute)
 import pyarrow.parquet as pq
 
 from ber import io_utils, match
@@ -85,6 +89,14 @@ def prep():
     seeds.assign(qid=SEED_BASE + np.arange(len(seeds))).to_parquet(R / "drace_test_seeds.parquet")
     print(f"prep: pool {len(pool):,}, S1 queries {len(s1):,}, seed queries {len(seeds):,}; "
           f"countries S1 {pd.Series(cty(s1.country_raw)).value_counts().to_dict()}")
+
+
+def s1_queries():
+    """S1 rows of drace_test_queries (no seed queries): input of the distilled-e5 S1 retrieval (RETR_QUERY_TAG=dracd_test_s1)."""
+    q = pq.read_table(R / "drace_test_queries.parquet")
+    q = q.filter(pa.compute.equal(q.column("kind"), "s1"))
+    pq.write_table(q, R / "dracd_test_s1_queries.parquet", compression="zstd")
+    print(f"s1 queries: {q.num_rows:,}")
 
 
 def pairs(k1, k2):
@@ -183,7 +195,7 @@ def merge(t, base_out=BASE_OUT, out=OUT, tag="drace_test", extra=()):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("step", choices=["prep", "pairs", "merge", "pairs_extra"])
+    ap.add_argument("step", choices=["prep", "s1_queries", "pairs", "merge", "pairs_extra"])
     ap.add_argument("--topk-tag", default="dracd_test")
     ap.add_argument("--set", default="DRACD_TEST")
     ap.add_argument("--skip", default="", help="comma list of already scored extra sets to exclude in pairs_extra")
@@ -196,5 +208,5 @@ if __name__ == "__main__":
     ap.add_argument("--tag", default="drace_test")
     a = ap.parse_args()
     SKIP_EXTRA[:] = [x for x in a.skip.split(",") if x]
-    {"prep": prep, "pairs": lambda: pairs(a.k1, a.k2), "merge": lambda: merge(a.t, Path(a.base), Path(a.out), a.tag, [x for x in a.extra.split(",") if x]),
+    {"prep": prep, "s1_queries": s1_queries, "pairs": lambda: pairs(a.k1, a.k2), "merge": lambda: merge(a.t, Path(a.base), Path(a.out), a.tag, [x for x in a.extra.split(",") if x]),
      "pairs_extra": lambda: pairs_extra(a.topk_tag, a.set, a.k1)}[a.step]()
