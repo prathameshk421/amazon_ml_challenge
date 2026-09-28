@@ -50,6 +50,8 @@ verified on the model card via huggingface_hub at download time and logged here.
 |---|---|---|---|
 | BAAI/bge-reranker-v2-m3 | rev 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e, 568M params | Apache-2.0 (model card) | base of the LoRA cross-encoder `cross_encoder_lora/adapter` (Friend B's fine-tune on DEV_REST_180K) |
 | peft | 0.21.0 | Apache-2.0 | load + merge the LoRA adapter (ce/inference.py, ce/hf_job/score_job.py) |
+| tokenizers | 0.23.2 | Apache-2.0 | fast tokenizer backend for transformers (project venv; submission pin) |
+| safetensors | 0.8.0 | Apache-2.0 | adapter weight files (project venv; submission pin) |
 | accelerate | 1.15.0 | Apache-2.0 | installed as a peft dependency (project venv) |
 | intfloat/multilingual-e5-small | rev 614241f622f53c4eeff9890bdc4f31cfecc418b3, 118M params | MIT (model card) | DRACE dense retrieval in submission 10 (ce/hf_job/retrieve_job.py, no fine-tuning); reverse-name retrieval (plan/checks/rev_prep.py) |
 | e5_distil (our fine-tune of intfloat/multilingual-e5-small) | 118M params, HF dataset repo prathameshk421/ber-ce-scoring/e5_distil | derivative of MIT weights | distilled from our c0 cross-encoder on DEV_REST_REST fold-1 train pairs (ce/hf_job/distill_job.py); DRACE S1 query in submissions 12-13 |

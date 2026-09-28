@@ -98,7 +98,7 @@ def main():
     print(f"fold {args.fold}: {tr_rows.size:,} train pairs ({np.unique(s1[tr_rows]).size:,} S1, "
           f"pos {y_all[tr_rows].mean():.3f}), held-out {ho_rows.size:,} pairs", flush=True)
 
-    tok = AutoTokenizer.from_pretrained(args.init_adapter)
+    tok = AutoTokenizer.from_pretrained(args.base)
     t0 = time.time()
     take = lambda col, rows: col.take(rows).to_pylist()
     tr_ids = tokenize(tok, take(a_all, tr_rows), take(b_all, tr_rows), args.max_length)

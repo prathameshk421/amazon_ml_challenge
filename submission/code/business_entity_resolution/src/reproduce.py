@@ -11,8 +11,8 @@ work/, metrics to artifacts/metrics/, one log per step to logs/<step>.log, final
 
 --models train   (default) trains every model from the training data, as the submission was built.
 --models shipped copies the trained models in code/business_entity_resolution/models/ into work/ and skips every
-                 step marked "train". The cross-encoder epoch-1 adapter (ce_rec) is always taken from models/:
-                 it was trained by a teammate script that is not part of this package (see README).
+                 step marked "train". The cross-encoder epoch-1 adapter (ce_rec) is always taken from models/: it was
+                 trained with src/ce/train_ce_rec.py, which reproduce.py does not run (README section 5).
 
 Steps marked GPU run the cross-encoder / e5 code on the local device (CUDA; MPS and CPU work but are far slower).
 Step order is the order the submission was built in, including the intermediate submission-9 and submission-13
@@ -115,7 +115,7 @@ def install_shipped():
     if (MODELS / "e5_distil").is_dir():
         copy_tree(MODELS / "e5_distil", "work/retrieval/e5_distil")()
     else:
-        print("models/e5_distil not in this package: step 'distill' will train it (GPU, ~7 min on an A100)")
+        print("models/e5_distil not in this package: step 'distill' is a train step; drace_distilled needs --models train")
 
 
 def finish():

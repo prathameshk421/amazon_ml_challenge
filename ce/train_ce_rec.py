@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ce_rec smoke/full trainer: LoRA (r=16, attention) + full classifier head, fp16.
+"""ce_rec smoke/full trainer: LoRA (r=16, attention) + full classifier head, bf16 on CUDA capability >= 8, else fp32.
 
 Thermal-safe by design for a laptop box:
   - DataLoader num_workers=0, torch threads capped (default 4)
@@ -8,11 +8,13 @@ Thermal-safe by design for a laptop box:
     above thresholds until the box cools.
 
 Usage (smoke):
-  .venv/bin/python work/ce/train_ce_rec.py --pairs work/ce/pairs/DEV_REST_180K.parquet \
+  .venv/bin/python code/business_entity_resolution/src/ce/train_ce_rec.py --pairs <pairs>.parquet \
       --out work/ce/ce_rec_smoke --max-rows 30000
 Full epoch:
-  .venv/bin/python work/ce/train_ce_rec.py --pairs work/ce/pairs/DEV_REST_180K.parquet \
+  .venv/bin/python code/business_entity_resolution/src/ce/train_ce_rec.py --pairs <pairs>.parquet \
       --out work/ce/ce_rec_ep1
+
+The --pairs file needs columns name_s1, addr_s1, name_pool, addr_pool, label, s1_idx, pool_idx.
 """
 
 import argparse, csv, itertools, json, os, shutil, sys, threading, time

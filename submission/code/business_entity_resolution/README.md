@@ -108,6 +108,9 @@ Two ways to run:
 
 - `--models train` (default): trains every model from the training data. This is how the submission was built.
 - `--models shipped`: inference on test with the models the submission used. Runs the `data` steps only.
+  Step 23 (drace_distilled) needs the distilled e5 from step 22 (distill). distill is a train step, so shipped
+  mode skips it, and its inputs (DEV_REST_REST fold-1 pairs and c0 scores) also come only from train steps.
+  e5_distil is not in the zip, so a shipped run stops at step 23. --models train is the complete pipeline.
 
 Run the CPU steps on one machine and the GPU steps on another by copying `work/` between them, for example:
 
@@ -177,14 +180,20 @@ Main intermediate files (under `work/`):
 |---|---|---|
 | `stage1/` | stage-1 logistic model (JSON) | step `stage1` |
 | `rerank/` | stage-2 LightGBM re-ranker + cut | step `stage2` |
-| `ce_rec_adapter/` | `ce_rec`: LoRA r 16, α 32, dropout 0.05 on query/key/value + classifier head of `BAAI/bge-reranker-v2-m3`; 1 epoch on 971,466 DEV_REST_180K pairs | a teammate's training script, **not in this package** (see below) |
+| `ce_rec_adapter/` | `ce_rec`: LoRA r 16, α 32, dropout 0.05 on query/key/value + classifier head of `BAAI/bge-reranker-v2-m3`; 1 epoch on 971,466 DEV_REST_180K pairs | `src/ce/train_ce_rec.py` (teammate's script; see below) |
 | `ce_rec_c0_adapter/` | `c0`: `ce_rec` continued on DEV_REST_REST fold 0; MATCH_VALID AUC 0.99896, logloss 0.0402 | step `ce_train` |
 | `matcher/full_c0/` | LightGBM, 69 features (submission 9) | step `matcher_s9` |
 | `matcher/full_c0_rgrp/` | LightGBM, 85 features, threshold 0.70 (step 20 writes the 0.73 copy) | step `matcher_s12` |
 
-`ce_rec` is the starting point of step 11 in both modes. It was trained outside this code base (log: 60,717 steps
-of batch 16, held-out AUC 0.9986); `src/ce/train.py --mode lora` is the closest script here but uses dropout 0.1,
-also adapts the `dense` layers and saves merged weights, so it does not reproduce `ce_rec`.
+`ce_rec` is the starting point of step 11 in both modes and is always taken from `models/`. It was trained
+with an earlier revision of `src/ce/train_ce_rec.py` (the log's setup line predates the dtype print) on one NVIDIA
+RTX 4060 Laptop GPU (CUDA capability 8.9, per the teammate; the log does not name the card). The weights were bf16
+with no autocast or GradScaler (log: 1.15 GB allocated for 571M parameters). Log
+(`cross_encoder_lora/ce_rec_ep1_train.log`): 976,897 pairs, 971,466 train / 5,431 held-out (last 1,000 S1 groups),
+60,717 steps of batch 16, held-out AUC 0.9986. Learning rate, seed and gradient accumulation are the script defaults
+(2e-4, 20260926, 4), not verified against the run. `ce_rec` is not wired into `reproduce.py`: the script reads
+`name_s1`/`addr_s1`/`name_pool`/`addr_pool`, while `src/ce/prepare_pairs.py` writes `text_a`/`text_b` (976,902 rows
+for DEV_REST_180K, 5 more than the teammate's file). The serialization `"{name} | {addr}"` is the same on both sides.
 
 The distilled retriever `e5_distil` (118M parameters) is not in the zip because of its size; step `distill` trains
 it again.
@@ -194,9 +203,9 @@ it again.
 - CPU steps use fixed seeds; LightGBM runs with `deterministic=true, force_row_wise=true`, which gives the same
   model for the same data, parameters and thread count. The thread count is `min(14, cores − 2)`; the submission
   used 6 (8-core machine). A different thread count can change the LightGBM trees slightly.
-- GPU steps are not bit-deterministic. bf16 matrix products differ slightly between GPU models and library versions,
+- GPU steps are not bit-deterministic. bf16 and fp16 matrix products differ slightly between GPU models and library versions,
   so a rerun of `ce_train`, `distill` or the retrievals can move scores near the 0.995 admission threshold and change
-  a small number of pairs. With `--models shipped` only scoring and retrieval run on the GPU.
+  a small number of pairs. `ce_train` runs fp16 + GradScaler on GPUs below CUDA capability 8 (the T4 run). With `--models shipped` only scoring and retrieval run on the GPU.
 - Not done for this package: a clean end-to-end rerun from an empty folder. The final `merge` step was rerun from the
   existing intermediate files and reproduced `matching_results.tsv` with the sha1 above.
 

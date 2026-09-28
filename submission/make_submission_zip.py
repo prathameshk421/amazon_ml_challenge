@@ -15,6 +15,7 @@ Zip layout (contest instructions):
 """
 import argparse
 import hashlib
+import json
 import shutil
 import zipfile
 from pathlib import Path
@@ -82,6 +83,12 @@ def main():
         (code / "models" / dst).mkdir(parents=True)
         for f in files:
             shutil.copy2(f, code / "models" / dst / Path(f).name)
+    # The ce_rec adapter was saved with a machine-local base_model_name_or_path; point the staged copy
+    # at the public Hub id (weights untouched; the c0 adapter already stores the Hub id).
+    ce_rec_cfg = code / "models" / "ce_rec_adapter" / "adapter_config.json"
+    cfg = json.loads(ce_rec_cfg.read_text())
+    cfg["base_model_name_or_path"] = "BAAI/bge-reranker-v2-m3"
+    ce_rec_cfg.write_text(json.dumps(cfg, indent=2) + "\n")
 
     out = Path(a.out or f"submission/{a.team}_submission.zip")
     out.unlink(missing_ok=True)
