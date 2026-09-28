@@ -20,7 +20,7 @@ import zipfile
 from pathlib import Path
 
 PKG = Path("submission/code/business_entity_resolution")
-CE_FILES = ["common.py", "prepare_pairs.py", "train.py", "train_continue.py"]
+CE_FILES = ["common.py", "prepare_pairs.py", "train.py", "train_ce_rec.py", "train_continue.py"]
 JOB_FILES = ["score_job.py", "retrieve_job.py", "ann_search.py", "distill_job.py", "collect.py"]
 PIPE_FILES = ["build_dev_rest.py", "dev_rest_180k.py", "dev_rest_full.py", "split_rest_folds.py", "rev_prep.py",
               "firstpass_oof.py", "grp_feats.py", "train_final_comp.py", "drace_test.py", "seed5_test_pairs.py",
