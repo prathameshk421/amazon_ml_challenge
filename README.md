@@ -47,6 +47,69 @@ Start here: `AGENTS.md` (rules) → `RESEARCH_LOG.md` (current best, open questi
 `submission/Documentation_template.md` (contest write-up) → `submission/code/business_entity_resolution/README.md`
 (how to run stages 1–3).
 
+## Glossary
+
+The sections below use the project's internal names. This table defines each one.
+
+**Data and splits**
+
+| Term | Meaning |
+|---|---|
+| S1 | Query records. Each S1 business has 0 to 11 copies in the pool. |
+| S2, S3 | The two other sources. Together they are the **pool**, the records we search. |
+| Train S1 / validation S1 | The 80/20 split of the labelled S1: 1,765,458 rows for fitting, 441,363 for scoring only. |
+| HOLDOUT_TEST | The code name for validation S1. |
+| MATCH_ALL | The 1,655,458 train S1 used for the cross-encoder and the stage-3 classifier. The rest of train S1 tuned stages 1 and 2. |
+| MATCH_TRAIN | 180,000 S1 from MATCH_ALL. The experiment set: every classifier change is compared on it with 5-fold GroupKFold by S1. |
+| MATCH_VALID | 20,000 S1. A small check set, scored only when a change is adopted. |
+| DEV_REST_180K | 180,000 S1 from MATCH_ALL. The cross-encoder trained on them for its first epoch. |
+| DEV_REST_REST | The rest of MATCH_ALL, in two folds. Fold 0 trained the cross-encoder's second epoch. Fold 1 trained the stage-3 classifier. |
+| OOF | Out-of-fold: a score for each row from a model that did not train on that row. |
+
+**Submissions and experiments**
+
+| Term | Meaning |
+|---|---|
+| S*N* (S1 … S18) | Submission number *N*. Files are in `submission/output_v<N>/`. Here S1 can also mean source 1; the context tells which. |
+| LB | The public leaderboard score of an uploaded submission. |
+| M###, N##, TH1, D10, SD5 | Experiment IDs. Each has an entry in `RESEARCH_LOG.md` or `exps/M###.json`. |
+| `run_s<N>.sh` | The shell script in `plan/checks/` that builds submission *N* from the previous one. |
+
+**Models and runs**
+
+| Term | Meaning |
+|---|---|
+| Stage 1 | Inverted-index blocking: hashed name and address keys plus a logistic model. About 290 candidates per S1. |
+| Stage 2 | LightGBM re-ranker. It cuts the list to about 6.1 candidates per S1. |
+| Stage 3, matcher | The LightGBM pair classifier that makes the lexical accept decision. |
+| `ce_rec` | Cross-encoder after epoch 1: a LoRA adapter on `BAAI/bge-reranker-v2-m3`. |
+| `c0`, `ce_rec_c0` | Cross-encoder after epoch 2. This is the live cross-encoder. |
+| `p_ce`, `ce_p` | The cross-encoder probability for a pair. It is one feature of the stage-3 classifier. |
+| `full_single` | Stage-3 classifier trained once on all of MATCH_ALL, without cross-encoder features (S2). |
+| `full_ce` | Stage-3 classifier with the `ce_rec` probability as a feature (S6). |
+| `full_c0` | Stage-3 classifier with the `c0` probability as a feature (S9). |
+| `full_c0_rgrp` | `full_c0` plus the reverse-name (`r`) and group-profile (`grp`) features. The live classifier. |
+| `_t073` | Suffix for a run with decision threshold 0.73. |
+| `e5_distil` | `intfloat/multilingual-e5-small` fine-tuned to copy the `c0` cross-encoder's scores. |
+| Seed matcher | An earlier classifier whose accepted pairs start copy expansion. It does not make final decisions. |
+
+**Decision rules and retrieval**
+
+| Term | Meaning |
+|---|---|
+| One-owner | A pool record goes only to the S1 that scores it highest. True links obey this rule. |
+| DRACE | Dense Retrieval And Copy Expansion. The second search after the classifier: bi-encoder nearest neighbours of each S1, plus neighbours of each accepted pool record. `c0` admits a new pair at p ≥ 0.995. |
+| DRACD, DRACD5 | DRACE pair files from the distilled bi-encoder (`e5_distil`). DRACD holds each S1's top 2 neighbours; DRACD5 adds ranks 3 to 5. |
+| Copy expansion | One business has about 3.45 pool copies. After one copy is accepted, its nearest neighbours are often the others. |
+
+**Feature groups (stage 3)**
+
+| Prefix | Meaning |
+|---|---|
+| `rv_*` (rev) | Reverse-name ownership: search from the pool name back to the S1 names, used when the pool address is empty. |
+| `nf_*` (nfreq) | Whole-name frequency: how often the name appears in S1 and in the pool. A common name is weaker evidence. |
+| `g_*` (grp) | Group profile: how the candidate compares with the S1's other accepted pool records. |
+
 ## Current best: submission 18, public LB 0.984075
 
 File: `submission/output_v18/matching_results.tsv` + `candidate_pairs.tsv` (sha1 of matching_results `7334635c…`;
