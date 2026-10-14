@@ -4,7 +4,8 @@ node_modules/
 __pycache__/
 *.pyc
 .pytest_cache/
-.claude/
+.claude/*
+!.claude/skills/
 .DS_Store
 **/.DS_Store
 

@@ -1,7 +1,47 @@
-# Amazon ML Challenge — business entity resolution
+<div align="center">
 
-Match each S1 business record to its copies in the S2 + S3 pool. Headline metric: per-S1-entity F0.5,
-macro-averaged over all S1 (precision-weighted: a false match costs more than a missed one). Rules in `AGENTS.md`.
+# Business entity resolution at 10-million-record scale
+
+**Amazon ML Challenge.** Link 1.73M business records to their copies in a 9.97M-record pool, across US, India and France.
+
+![Public LB F0.5](https://img.shields.io/badge/public%20LB%20F0.5-0.984075-0F2540)
+![Python](https://img.shields.io/badge/Python-3-1F5FAD?logo=python&logoColor=white)
+![LightGBM](https://img.shields.io/badge/LightGBM-pair%20classifier-1F5FAD)
+![PyTorch](https://img.shields.io/badge/PyTorch-LoRA%20cross--encoder-6B3FB5?logo=pytorch&logoColor=white)
+![Hugging Face](https://img.shields.io/badge/Hugging%20Face-Jobs%20A100%20%2F%20H200-6B3FB5?logo=huggingface&logoColor=white)
+![Parquet](https://img.shields.io/badge/storage-Parquet%20%2B%20CSR%20.npy-00796B)
+
+</div>
+
+![System architecture](docs/architecture/system-architecture.drawio.png)
+
+## At a glance
+
+| | |
+|---|---|
+| **Problem** | Each S1 record has 0 to 11 true copies in the S2 + S3 pool (mean 3.45). A pool record belongs to at most one S1. |
+| **Search space** | 1.73M × 9.97M = 1.7 × 10¹³ possible pairs. Blocking and re-ranking cut this to ~10.6M scored pairs (6.1 per S1). |
+| **Models** | LightGBM re-ranker (35 features), LightGBM pair classifier (85 features), LoRA cross-encoder on `BAAI/bge-reranker-v2-m3` (568M), `intfloat/multilingual-e5-small` bi-encoder (118M), published and distilled. |
+| **Compute** | One CPU host for indexing, features and LightGBM. GPU scoring and retrieval run as stateless Hugging Face Jobs (A100, H200). |
+| **Metric** | F0.5 per S1, macro-averaged. Precision-weighted: a false match costs more than a missed one. |
+| **Result** | Public leaderboard F0.5 **0.984075**. |
+
+## Architecture
+
+- **Lexical path:** inverted index (290 per S1) → LightGBM re-ranker (6.1 per S1) → LoRA cross-encoder → LightGBM pair classifier, accept at p ≥ 0.73.
+- **Dense path:** e5 bi-encoder kNN per country, plus kNN of accepted records → cross-encoder gate at p ≥ 0.995.
+- **One-owner:** each pool record goes to the S1 with the highest score.
+
+![Compute and data plane](docs/architecture/compute-and-data-plane.drawio.png)
+
+![Training and evaluation](docs/architecture/training-and-evaluation.drawio.png)
+
+The diagrams are editable: open any `.drawio.png` or `.drawio` file in [draw.io](https://app.diagrams.net). To
+rebuild them, run `python docs/architecture/generate.py docs/architecture`. They were made with the
+[drawio-skill](https://github.com/Agents365-ai/drawio-skill) Claude Code skill (MIT), vendored in
+`.claude/skills/drawio-skill/`.
+
+## Repository guide
 
 Start here: `AGENTS.md` (rules) → `RESEARCH_LOG.md` (current best, open questions, every run, newest first) →
 `submission/Documentation_template.md` (contest write-up) → `submission/code/business_entity_resolution/README.md`
@@ -36,22 +76,8 @@ Pipeline, in order:
    S18: 5,728,253 matcher pairs + 84,402 DRACE pairs = 5,812,655; candidate file 10.13 pairs per S1.
 
 **Cross-encoder c0** (`ce_rec_c0`): LoRA adapter on `BAAI/bge-reranker-v2-m3` (568M params). Trained 1 epoch on
-DEV_REST_180K (`ce_rec`), then continued 1 epoch on DEV_REST_REST fold 0 (3,285,477 pairs). MATCH_VALID AUC
-0.99896, logloss 0.0402 (`ce_rec_c0_eval.json`). Scoring and retrieval run as Hugging Face Jobs (A100 / H200,
+DEV_REST_180K (`ce_rec`), then continued 1 epoch on DEV_REST_REST fold 0 (3,285,477 pairs). Scoring and retrieval run as Hugging Face Jobs (A100 / H200,
 `ce/hf_job/`); LightGBM runs locally.
-
-## Internal scores (train labels only)
-
-| What | Set | F0.5 | Metrics file |
-|---|---|---|---|
-| Stage 1+2 recall ceiling, mean list 5.43 | validation S1, 441,363 | 0.99276 | `rerank_eval_HOLDOUT_TEST.json` |
-| Live matcher at its fitted threshold 0.70 | 83,523 S1 held out of MATCH_ALL | 0.98643 (+0.00477 [0.00442, 0.00511] over full_single, same S1) | `match_train_full_c0_rgrp.json` |
-| S16-equivalent (M027 5-fold OOF matcher + S16's DRACE channels) | MATCH_TRAIN, 180,000 S1 | 0.98875 | `empty_rescue.json` (`base`) |
-| Stage-3 headline on validation S1 | validation S1 | **not scored** for any matcher since submission 1 | — |
-
-Internal→leaderboard gap: −0.0148 at S2, −0.0093 at S7, about −0.0071 at S10 (RESEARCH_LOG S10-LB). N03/N04
-attribute ~0.008 of the S2 gap to longer, more uncertain test candidate lists; the rest is not measurable without
-test labels.
 
 ## Leaderboard history
 
